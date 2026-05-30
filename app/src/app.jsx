@@ -4,7 +4,7 @@
 const { useEffect: useEff } = React;
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "gauge": "radial",
+  "gauge": "linear",
   "lowCut": 6,
   "highCut": 15,
   "density": "regular"
