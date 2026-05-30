@@ -52,12 +52,22 @@ def main() -> int:
         print(f"Downloading full competition archive: {KAGGLE_COMPETITION} ...")
         api.competition_download_files(KAGGLE_COMPETITION, path=str(RAW_DIR))
 
-    # Unzip any archives that landed in RAW_DIR.
-    for zpath in RAW_DIR.glob("*.zip"):
-        print(f"Unzipping {zpath.name} ...")
-        with zipfile.ZipFile(zpath) as zf:
+    # Decompress archives. The whole-competition download lands as *.zip; the
+    # per-file API returns a ZIP archive but saves it with a *.csv name, so we
+    # check every file's magic bytes rather than trusting the extension.
+    for path in list(RAW_DIR.iterdir()):
+        if not path.is_file() or not zipfile.is_zipfile(path):
+            continue
+        print(f"Unzipping {path.name} ...")
+        with zipfile.ZipFile(path) as zf:
+            names = zf.namelist()
             zf.extractall(RAW_DIR)
-        zpath.unlink()
+        # If a *.csv was actually a zip wrapping the same-named CSV, the extract
+        # above already overwrote it with the real CSV. Only remove leftover *.zip.
+        if path.suffix == ".zip":
+            path.unlink()
+        elif names == [path.name]:
+            pass  # extracted in place, nothing to clean
 
     print(f"Done. Files in {RAW_DIR}:")
     for p in sorted(RAW_DIR.glob("*.csv")):
