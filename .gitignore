@@ -34,3 +34,6 @@ notebooks/*-scratch.ipynb
 # OS / IDE
 .DS_Store
 Thumbs.db
+
+# Generated profiling/EDA reports
+reports/
