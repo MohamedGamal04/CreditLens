@@ -17,7 +17,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from creditlens.config import ID_COL, TARGET
+from creditlens.config import ID_COL, PROCESSED_DIR, TARGET
 
 
 def _clean_inf(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
@@ -198,3 +198,26 @@ def build_model_matrix(
     # Stable column order: id, the 15 features, then target.
     cols = [ID_COL, *MODEL_FEATURES] + ([TARGET] if with_target and TARGET in out.columns else [])
     return out[cols]
+
+
+def load_or_build_model_matrix(*, use_cache: bool = True, cache_name: str = "model_matrix.pkl") -> pd.DataFrame:
+    """Return the 15-feature contract frame, caching it to ``data/processed/``.
+
+    Aggregating the 1.7M-row side tables every run is wasteful; this caches the
+    result (gitignored) so modeling notebooks load it instantly. Delete the cache
+    file or pass ``use_cache=False`` to force a rebuild after changing the features.
+    """
+    from creditlens.data.load import (
+        load_application,
+        load_bureau,
+        load_previous_application,
+    )
+
+    cache = PROCESSED_DIR / cache_name
+    if use_cache and cache.exists():
+        return pd.read_pickle(cache)
+
+    mat = build_model_matrix(load_application(), load_bureau(), load_previous_application())
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    mat.to_pickle(cache)
+    return mat
