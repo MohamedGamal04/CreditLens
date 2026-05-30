@@ -17,7 +17,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from creditlens.config import ID_COL
+from creditlens.config import ID_COL, TARGET
 
 
 def _clean_inf(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
@@ -102,3 +102,99 @@ def build_features(
         df[col] = df[col].fillna(0)
 
     return df
+
+
+# ---------------------------------------------------------------------------
+# 15-feature MODEL CONTRACT
+# ---------------------------------------------------------------------------
+# These are the exact inputs the web frontend collects (see app/src/model.js).
+# The served models train and predict on THIS set so the form -> API -> model
+# path is fully consistent. ``build_features`` above stays as the richer EDA /
+# exploration frame; ``build_model_matrix`` below is the production contract.
+MODEL_FEATURES = [
+    "ext_source_1",
+    "ext_source_2",
+    "ext_source_3",
+    "credit_to_income",
+    "annuity_to_income",
+    "age",
+    "emp_years",
+    "region_rating",
+    "cnt_children",
+    "bureau_dpd",
+    "bureau_active",
+    "bureau_debt",
+    "prev_approval",
+    "prev_refused",
+    "prev_count",
+]
+
+
+def _bureau_contract(bureau: pd.DataFrame) -> pd.DataFrame:
+    """Bureau aggregates for the contract: active count, DPD count, total debt."""
+    b = bureau.copy()
+    b["_active"] = (b["CREDIT_ACTIVE"] == "Active").astype(int)
+    b["_dpd"] = (b["CREDIT_DAY_OVERDUE"] > 0).astype(int)  # count of past-due tradelines
+    agg = b.groupby(ID_COL).agg(
+        bureau_active=("_active", "sum"),
+        bureau_dpd=("_dpd", "sum"),
+        bureau_debt=("AMT_CREDIT_SUM_DEBT", "sum"),
+    )
+    return agg.reset_index()
+
+
+def _previous_contract(prev: pd.DataFrame) -> pd.DataFrame:
+    """Previous-application aggregates: count, approval rate, refusal count."""
+    p = prev.copy()
+    p["_approved"] = (p["NAME_CONTRACT_STATUS"] == "Approved").astype(int)
+    p["_refused"] = (p["NAME_CONTRACT_STATUS"] == "Refused").astype(int)
+    agg = p.groupby(ID_COL).agg(
+        prev_count=("SK_ID_PREV", "count"),
+        prev_approval=("_approved", "mean"),
+        prev_refused=("_refused", "sum"),
+    )
+    return agg.reset_index()
+
+
+def build_model_matrix(
+    app: pd.DataFrame,
+    bureau: pd.DataFrame,
+    prev: pd.DataFrame,
+    *,
+    with_target: bool = True,
+) -> pd.DataFrame:
+    """Build the 15-feature contract frame (plus ``SK_ID_CURR`` and optional TARGET).
+
+    Columns are exactly ``MODEL_FEATURES`` — the same inputs the frontend form
+    collects — so a request from the UI maps one-to-one onto the model's features.
+    No-history applicants get 0 for count features; ``bureau_debt`` / ``prev_approval``
+    stay NaN for the pipeline's imputer.
+    """
+    a = app
+    income = a["AMT_INCOME_TOTAL"].replace(0, np.nan)
+
+    out = pd.DataFrame({ID_COL: a[ID_COL].to_numpy()})
+    out["ext_source_1"] = a["EXT_SOURCE_1"].to_numpy()
+    out["ext_source_2"] = a["EXT_SOURCE_2"].to_numpy()
+    out["ext_source_3"] = a["EXT_SOURCE_3"].to_numpy()
+    out["credit_to_income"] = (a["AMT_CREDIT"] / income).to_numpy()
+    out["annuity_to_income"] = (a["AMT_ANNUITY"] / income).to_numpy()
+    out["age"] = (-a["DAYS_BIRTH"] / 365).to_numpy()
+    out["emp_years"] = (-a["DAYS_EMPLOYED"] / 365).to_numpy()
+    out["region_rating"] = a["REGION_RATING_CLIENT"].to_numpy()
+    out["cnt_children"] = a["CNT_CHILDREN"].to_numpy()
+
+    out = out.merge(_bureau_contract(bureau), on=ID_COL, how="left")
+    out = out.merge(_previous_contract(prev), on=ID_COL, how="left")
+
+    for col in ["bureau_active", "bureau_dpd", "prev_count", "prev_refused"]:
+        out[col] = out[col].fillna(0)
+
+    out = _clean_inf(out, ["credit_to_income", "annuity_to_income"])
+
+    if with_target and TARGET in a.columns:
+        out[TARGET] = a[TARGET].to_numpy()
+
+    # Stable column order: id, the 15 features, then target.
+    cols = [ID_COL, *MODEL_FEATURES] + ([TARGET] if with_target and TARGET in out.columns else [])
+    return out[cols]

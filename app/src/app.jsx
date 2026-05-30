@@ -1,0 +1,151 @@
+/* ===================================================================
+   CreditLens — app shell: nav, routing, shared state, tweaks
+   =================================================================== */
+const { useEffect: useEff } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "gauge": "radial",
+  "lowCut": 6,
+  "highCut": 15,
+  "density": "regular"
+}/*EDITMODE-END*/;
+
+const NAV = [
+  { id: 'applicant', label: 'Applicant', icon: 'applicant' },
+  { id: 'explain',   label: 'Explanation', icon: 'explain' },
+  { id: 'portfolio', label: 'Portfolio', icon: 'portfolio' },
+  { id: 'modelcard', label: 'Model card', icon: 'modelcard' },
+];
+const TITLES = {
+  applicant: ['Applicant assessment', 'Score a single application'],
+  explain:   ['Decision explanation', 'Feature-level attribution'],
+  portfolio: ['Portfolio dashboard', 'Batch risk across the book'],
+  modelcard: ['Model card', 'Performance · fairness · governance'],
+};
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [route, setRoute] = useState(() => (location.hash.replace('#', '') || 'applicant'));
+  const [applicant, setApplicant] = useState({ ...CL.DEFAULT_APPLICANT });
+  const [portfolio, setPortfolio] = useState(null);
+  const [model, setModel] = useState('lgbm');
+
+  // thresholds from tweaks → into the model
+  const thresholds = { low: t.lowCut / 100, high: t.highCut / 100 };
+  useEff(() => { CL.setThresholds(thresholds.low, thresholds.high); }, [t.lowCut, t.highCut]);
+
+  // validation set + per-model leaderboard (drives selector AUC + model card)
+  const valSet = useMemo(() => CL.makePortfolio(2400, 7), []);
+  const board = useMemo(() => CL.leaderboard(valSet), [valSet, t.lowCut, t.highCut]);
+  const aucMap = useMemo(() => Object.fromEntries(board.map(m => [m.key, m.auc])), [board]);
+
+  // recompute score whenever applicant / model / thresholds change
+  const result = useMemo(() => CL.score(sanitize(applicant), model), [applicant, model, t.lowCut, t.highCut]);
+
+  const go = r => { setRoute(r); location.hash = r; document.querySelector('.main').scrollTop = 0; };
+  useEff(() => {
+    const h = () => setRoute(location.hash.replace('#', '') || 'applicant');
+    window.addEventListener('hashchange', h); return () => window.removeEventListener('hashchange', h);
+  }, []);
+
+  const inspect = app => { setApplicant({ ...CL.DEFAULT_APPLICANT, ...app }); go('explain'); };
+  const loadPortfolio = () => setPortfolio(CL.makePortfolio(240, 42));
+
+  const [title, sub] = TITLES[route];
+
+  return (
+    <div className={`app density-${t.density}`}>
+      {/* sidebar */}
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /><path d="M11 8v3l2 2" />
+            </svg>
+          </div>
+          <div>
+            <div className="brand-name">CreditLens</div>
+            <div className="brand-sub">risk engine</div>
+          </div>
+        </div>
+
+        <div className="nav-section-label">Underwriting</div>
+        {NAV.map(n => (
+          <button key={n.id} className={`nav-item ${route === n.id ? 'active' : ''}`} onClick={() => go(n.id)}>
+            <I name={n.icon} size={17} />{n.label}
+            {n.id === 'portfolio' && portfolio && <span className="nav-badge">{portfolio.length}</span>}
+            {n.id === 'applicant' && <span className="nav-badge" style={{ background: route === 'applicant' ? 'rgba(255,255,255,.2)' : RISK[result.band].c, color: '#fff' }}>{pct(result.prob, 0)}</span>}
+          </button>
+        ))}
+
+        <div className="sidebar-foot">
+          <div className="avatar">DM</div>
+          <div>
+            <div className="who">D. Mensah</div>
+            <div className="role">Senior loan officer</div>
+          </div>
+        </div>
+      </aside>
+
+      {/* main */}
+      <main className="main">
+        <header className="topbar">
+          <div>
+            <div className="crumb">CreditLens <span style={{ color: 'var(--ink-4)' }}>/</span> {sub}</div>
+            <h1>{title}</h1>
+          </div>
+          <div className="spacer" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            {route === 'portfolio' && portfolio && (
+              <button className="btn btn-ghost" onClick={() => setPortfolio(null)}><I name="upload" size={15} />New batch</button>
+            )}
+            {route === 'modelcard' && (
+              <button className="btn btn-ghost"><I name="download" size={15} />Export PDF</button>
+            )}
+            <span className="api-pill"><span className="live" />POST /predict · 200</span>
+            <ModelSelector value={model} onChange={setModel} aucMap={aucMap} />
+          </div>
+        </header>
+
+        {route === 'applicant' && <ApplicantPage applicant={applicant} setApplicant={setApplicant} result={result} gaugeVariant={t.gauge} thresholds={thresholds} model={model} go={go} />}
+        {route === 'explain'   && <ExplanationPage applicant={applicant} result={result} thresholds={thresholds} model={model} go={go} />}
+        {route === 'portfolio' && <PortfolioPage portfolio={portfolio} loadPortfolio={loadPortfolio} thresholds={thresholds} model={model} inspect={inspect} />}
+        {route === 'modelcard' && <ModelCardPage thresholds={thresholds} model={model} setModel={setModel} valSet={valSet} board={board} />}
+      </main>
+
+      {/* tweaks */}
+      <TweaksPanel>
+        <TweakSection label="Risk gauge" />
+        <TweakRadio label="Style" value={t.gauge} options={['radial', 'linear']} onChange={v => setTweak('gauge', v)} />
+        <TweakSection label="Band thresholds" />
+        <TweakSlider label="Low / Medium cut" value={t.lowCut} min={3} max={15} step={1} unit="%" onChange={v => setTweak('lowCut', Math.min(v, t.highCut - 2))} />
+        <TweakSlider label="Medium / High cut" value={t.highCut} min={16} max={45} step={1} unit="%" onChange={v => setTweak('highCut', Math.max(v, t.lowCut + 2))} />
+        <TweakSection label="Layout" />
+        <TweakRadio label="Density" value={t.density} options={['compact', 'regular']} onChange={v => setTweak('density', v)} />
+      </TweaksPanel>
+    </div>
+  );
+}
+
+// guard against empty/NaN inputs while typing
+function sanitize(a) {
+  const n = (v, d) => (v === '' || v == null || isNaN(v)) ? d : +v;
+  const D = CL.DEFAULT_APPLICANT;
+  return {
+    contract: a.contract, education: a.education, gender: a.gender,
+    amt_income: Math.max(1, n(a.amt_income, D.amt_income)),
+    amt_credit: n(a.amt_credit, D.amt_credit),
+    amt_annuity: n(a.amt_annuity, D.amt_annuity),
+    ext_source_1: n(a.ext_source_1, D.ext_source_1),
+    ext_source_2: n(a.ext_source_2, D.ext_source_2),
+    ext_source_3: n(a.ext_source_3, D.ext_source_3),
+    age: n(a.age, D.age), emp_years: n(a.emp_years, D.emp_years),
+    region_rating: n(a.region_rating, 2), cnt_children: n(a.cnt_children, 0),
+    bureau_dpd: n(a.bureau_dpd, 0), bureau_active: n(a.bureau_active, 1),
+    bureau_debt: n(a.bureau_debt, D.bureau_debt),
+    prev_approval: n(a.prev_approval, D.prev_approval),
+    prev_refused: n(a.prev_refused, 0), prev_count: n(a.prev_count, D.prev_count),
+  };
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);

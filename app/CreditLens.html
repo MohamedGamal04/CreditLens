@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CreditLens — Loan Risk Assessment</title>
+  <link rel="stylesheet" href="src/styles.css" />
+  <template id="__bundler_thumbnail">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" fill="#1e3a8a" />
+      <g transform="translate(50 52)" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round">
+        <path d="M-22 6 A22 22 0 0 1 22 6" opacity="0.4" />
+        <path d="M-22 6 A22 22 0 0 1 -6 -19" stroke="#38bdf8" />
+        <line x1="0" y1="6" x2="11" y2="-9" />
+      </g>
+    </svg>
+  </template>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script src="src/model.js"></script>
+  <script type="text/babel" src="src/charts.jsx"></script>
+  <script type="text/babel" src="src/shared.jsx"></script>
+  <script type="text/babel" src="src/tweaks-panel.jsx"></script>
+  <script type="text/babel" src="src/ApplicantPage.jsx"></script>
+  <script type="text/babel" src="src/ExplanationPage.jsx"></script>
+  <script type="text/babel" src="src/PortfolioPage.jsx"></script>
+  <script type="text/babel" src="src/ModelCardPage.jsx"></script>
+  <script type="text/babel" src="src/app.jsx"></script>
+</body>
+</html>
