@@ -46,28 +46,32 @@ def make_pipeline(name: str) -> Pipeline:
         )
         return Pipeline(_pre(scale=True) + [("clf", clf)])
     if name == "rf":
+        # tuned: n_estimators=400, max_depth=15, min_samples_leaf=20
         clf = RandomForestClassifier(
-            n_estimators=300, max_depth=15, min_samples_leaf=20,
+            n_estimators=400, max_depth=15, min_samples_leaf=20,
             class_weight="balanced", n_jobs=-1, random_state=RANDOM_SEED,
         )
         return Pipeline(_pre() + [("clf", clf)])
     if name == "xgb":
+        # tuned: max_depth=3, learning_rate=0.03, n_estimators=600
         clf = XGBClassifier(
-            n_estimators=400, learning_rate=0.05, max_depth=4,
+            n_estimators=600, learning_rate=0.03, max_depth=3,
             subsample=0.8, colsample_bytree=0.8, scale_pos_weight=SCALE_POS_WEIGHT,
             eval_metric="auc", tree_method="hist", n_jobs=-1, random_state=RANDOM_SEED,
         )
         return Pipeline(_pre() + [("clf", clf)])
     if name == "lgbm":
+        # tuned: num_leaves=31, learning_rate=0.03, n_estimators=400
         clf = LGBMClassifier(
-            n_estimators=600, learning_rate=0.05, num_leaves=31,
+            n_estimators=400, learning_rate=0.03, num_leaves=31,
             subsample=0.8, colsample_bytree=0.8, class_weight="balanced",
             n_jobs=-1, random_state=RANDOM_SEED, verbose=-1,
         )
         return Pipeline(_pre() + [("clf", clf)])
     if name == "catboost":
+        # tuned: depth=6, learning_rate=0.03
         clf = CatBoostClassifier(
-            iterations=400, learning_rate=0.05, depth=6,
+            iterations=400, learning_rate=0.03, depth=6,
             scale_pos_weight=SCALE_POS_WEIGHT, verbose=0, random_seed=RANDOM_SEED,
         )
         return Pipeline(_pre() + [("clf", clf)])
