@@ -26,4 +26,10 @@ Side experiments worth running, with hypothesis + success criterion so results a
 
 **Decision rule.** Even if AUC ties, **do not** use PCA in serving — it kills the per-feature explanation the UI and model card require. PCA stays a learning experiment only.
 
-**Status:** TODO (run after Phase 3 modeling baseline exists).
+**Status:** ✅ DONE — see `notebooks/exp_pca.ipynb`. **Result: PCA does not help.**
+- LogReg (no PCA) OOF AUC **0.7279** / KS 0.335.
+- `PCA(n=15)` = 0.7279 (full rotation is lossless); fewer components strictly worse:
+  n=12 −0.0016, n=10 −0.0045, n=8 −0.0119, n=5 −0.0212.
+- Explained variance is gradual (≈12 comps for 95%, no elbow) → features aren't redundant; PCA can't
+  compress without dropping signal.
+- **Conclusion:** keep PCA out of the production pipeline (no AUC gain + loses per-feature interpretability).
