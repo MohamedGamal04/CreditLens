@@ -130,6 +130,33 @@ MODEL_FEATURES = [
 ]
 
 
+def applicant_to_features(a: dict) -> dict:
+    """Map a raw frontend applicant payload to the 15-feature contract (one row).
+
+    The form already collects ``age`` and ``emp_years`` in years and the bureau /
+    previous aggregates directly, so we only derive the two affordability ratios.
+    Mirrors ``deriveInputs`` in app/src/model.js and ``build_model_matrix``.
+    """
+    income = max(float(a["amt_income"]), 1.0)  # guard divide-by-zero
+    return {
+        "ext_source_1": a["ext_source_1"],
+        "ext_source_2": a["ext_source_2"],
+        "ext_source_3": a["ext_source_3"],
+        "credit_to_income": float(a["amt_credit"]) / income,
+        "annuity_to_income": float(a["amt_annuity"]) / income,
+        "age": a["age"],
+        "emp_years": a["emp_years"],
+        "region_rating": a["region_rating"],
+        "cnt_children": a["cnt_children"],
+        "bureau_dpd": a["bureau_dpd"],
+        "bureau_active": a["bureau_active"],
+        "bureau_debt": a["bureau_debt"],
+        "prev_approval": a["prev_approval"],
+        "prev_refused": a["prev_refused"],
+        "prev_count": a["prev_count"],
+    }
+
+
 def _bureau_contract(bureau: pd.DataFrame) -> pd.DataFrame:
     """Bureau aggregates for the contract: active count, DPD count, total debt."""
     b = bureau.copy()

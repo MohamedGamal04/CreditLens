@@ -39,8 +39,27 @@ function App() {
   const board = useMemo(() => CL.leaderboard(valSet), [valSet, t.lowCut, t.highCut]);
   const aucMap = useMemo(() => Object.fromEntries(board.map(m => [m.key, m.auc])), [board]);
 
-  // recompute score whenever applicant / model / thresholds change
-  const result = useMemo(() => CL.score(sanitize(applicant), model), [applicant, model, t.lowCut, t.highCut]);
+  // Local toy scorer — instant attributions for the "Top drivers" panel, and the
+  // fallback when the API isn't running (so the design still works from file://).
+  const localResult = useMemo(() => CL.score(sanitize(applicant), model), [applicant, model, t.lowCut, t.highCut]);
+
+  // Live score from the real backend (creditlens.serve.api /predict). Debounced.
+  const [apiScore, setApiScore] = useState(null);
+  useEff(() => {
+    const ctrl = new AbortController();
+    const id = setTimeout(() => {
+      fetch('/predict', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
+        body: JSON.stringify({ applicant: sanitize(applicant), model, low: thresholds.low, high: thresholds.high }),
+      }).then(r => (r.ok ? r.json() : null)).then(d => setApiScore(d)).catch(() => {});
+    }, 180);
+    return () => { clearTimeout(id); ctrl.abort(); };
+  }, [applicant, model, t.lowCut, t.highCut]);
+
+  // Use the calibrated API PD/band when available; keep local attribution steps.
+  const result = apiScore
+    ? { ...localResult, prob: apiScore.probability, band: apiScore.band }
+    : localResult;
 
   const go = r => { setRoute(r); location.hash = r; document.querySelector('.main').scrollTop = 0; };
   useEff(() => {
@@ -94,7 +113,9 @@ function App() {
             {route === 'modelcard' && (
               <button className="btn btn-ghost"><I name="download" size={15} />Export PDF</button>
             )}
-            <span className="api-pill"><span className="live" />POST /predict · 200</span>
+            <span className="api-pill" title={apiScore ? 'calibrated PD from backend' : 'backend offline — local fallback'}>
+              <span className="live" style={{ background: apiScore ? undefined : 'var(--ink-4)' }} />
+              POST /predict · {apiScore ? '200' : 'offline'}</span>
             <ModelSelector value={model} onChange={setModel} aucMap={aucMap} />
           </div>
         </header>
