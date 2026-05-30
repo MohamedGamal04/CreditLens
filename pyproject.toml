@@ -22,6 +22,8 @@ dependencies = [
     "pydantic>=2.6",
     "kaggle>=1.6",
     "ydata-profiling>=4.18.4",
+    "setuptools<80",
+    "plotly>=6.7.0",
 ]
 
 [project.optional-dependencies]
