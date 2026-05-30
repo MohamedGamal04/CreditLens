@@ -11,6 +11,7 @@ we map it to NaN here.
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from creditlens import config
@@ -22,7 +23,8 @@ def load_application(path=None) -> pd.DataFrame:
     """Load the main applicant table (one row per loan application)."""
     df = pd.read_csv(path or config.APPLICATION_TRAIN)
     if "DAYS_EMPLOYED" in df.columns:
-        df["DAYS_EMPLOYED"] = df["DAYS_EMPLOYED"].replace(DAYS_EMPLOYED_ANOMALY, pd.NA)
+        # np.nan (not pd.NA) keeps the column float64 so downstream arithmetic/describe work.
+        df["DAYS_EMPLOYED"] = df["DAYS_EMPLOYED"].replace(DAYS_EMPLOYED_ANOMALY, np.nan)
     return df
 
 
