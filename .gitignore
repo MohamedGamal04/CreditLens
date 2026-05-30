@@ -1,0 +1,36 @@
+# Data & model artifacts (never commit the multi-GB Kaggle data or trained models)
+data/raw/*
+data/processed/*
+models/*
+!**/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.coverage
+htmlcov/
+
+# Notebook scratch outputs
+notebooks/*-scratch.ipynb
+
+# Secrets
+.kaggle/
+*.env
+
+# OS / IDE
+.DS_Store
+Thumbs.db
