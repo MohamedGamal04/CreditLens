@@ -307,7 +307,7 @@ input, select { font-family: inherit; }
 .seg button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
 
 /* slider */
-.range { width: 100%; appearance: none; height: 5px; border-radius: 4px; background: var(--border); outline: none; }
+.range { width: 100%; min-width: 0; box-sizing: border-box; appearance: none; height: 5px; border-radius: 4px; background: var(--border); outline: none; }
 .range::-webkit-slider-thumb {
   appearance: none; width: 17px; height: 17px; border-radius: 50%;
   background: var(--blue-700); cursor: pointer; border: 2.5px solid #fff;

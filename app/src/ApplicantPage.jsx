@@ -50,7 +50,7 @@ function ApplicantPage({ applicant, setApplicant, result, gaugeVariant, threshol
         {/* ---- form ---- */}
         <div className="card">
           <div className="card-head">
-            <div className="card-title">Applicant profile<div className="sub">SK_ID_CURR 100002 · {applicant.contract}</div></div>
+            <div className="card-title">Applicant profile<div className="sub">SK_ID_CURR 100002</div></div>
             <div className="spacer" />
             <span className="id mono" style={{ fontSize: 12, color: 'var(--ink-4)' }}>application_train</span>
           </div>
@@ -60,18 +60,6 @@ function ApplicantPage({ applicant, setApplicant, result, gaugeVariant, threshol
             <div>
               <SectionHead table="application" title="Application" note="primary record" />
               <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 18 }}>
-                <div className="field">
-                  <label>Contract type</label>
-                  <div className="seg">
-                    {['Cash loans', 'Revolving loans'].map(c => <button key={c} className={applicant.contract === c ? 'on' : ''} onClick={() => set('contract', c)}>{c.split(' ')[0]}</button>)}
-                  </div>
-                </div>
-                <div className="field">
-                  <label>Education</label>
-                  <select className="select" value={applicant.education} onChange={e => set('education', e.target.value)}>
-                    {['Lower secondary','Secondary / secondary special','Incomplete higher','Higher education','Academic degree'].map(p => <option key={p}>{p}</option>)}
-                  </select>
-                </div>
                 <NumField label="Income (AMT_INCOME_TOTAL)" prefix="$" value={applicant.amt_income} step={5000} onChange={v => set('amt_income', v)} />
                 <NumField label="Credit (AMT_CREDIT)" prefix="$" value={applicant.amt_credit} step={5000} onChange={v => set('amt_credit', v)} />
                 <NumField label="Annuity (AMT_ANNUITY)" prefix="$" value={applicant.amt_annuity} step={500} onChange={v => set('amt_annuity', v)} />
@@ -95,7 +83,7 @@ function ApplicantPage({ applicant, setApplicant, result, gaugeVariant, threshol
               <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px' }}>
                 <div style={{ fontSize: 12, fontWeight: 650, color: 'var(--ink-2)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 7 }}>
                   <I name="bolt" size={14} /> External credit scores <span className="dim" style={{ fontWeight: 450 }}>· strongest predictors</span></div>
-                <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 20 }}>
+                <div className="grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
                   <ExtSlider label="EXT_SOURCE_1" value={applicant.ext_source_1} onChange={v => set('ext_source_1', v)} />
                   <ExtSlider label="EXT_SOURCE_2" value={applicant.ext_source_2} onChange={v => set('ext_source_2', v)} />
                   <ExtSlider label="EXT_SOURCE_3" value={applicant.ext_source_3} onChange={v => set('ext_source_3', v)} />
