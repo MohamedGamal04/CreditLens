@@ -77,14 +77,6 @@ function App() {
             {n.id === 'applicant' && <span className="nav-badge" style={{ background: route === 'applicant' ? 'rgba(255,255,255,.2)' : RISK[result.band].c, color: '#fff' }}>{pct(result.prob, 0)}</span>}
           </button>
         ))}
-
-        <div className="sidebar-foot">
-          <div className="avatar">DM</div>
-          <div>
-            <div className="who">D. Mensah</div>
-            <div className="role">Senior loan officer</div>
-          </div>
-        </div>
       </aside>
 
       {/* main */}
