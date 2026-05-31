@@ -1,50 +1,115 @@
 # CreditLens
 
-Credit default risk modeling on the Kaggle [Home Credit Default Risk](https://www.kaggle.com/competitions/home-credit-default-risk/) dataset.
+Credit default-risk modeling on the Kaggle [Home Credit Default Risk](https://www.kaggle.com/competitions/home-credit-default-risk/) dataset — an end-to-end ML project: data → features → 6 tuned & calibrated models → FastAPI serving → an interactive risk-assessment web app.
 
-CreditLens trains and compares several models to predict an applicant's **probability of default (PD)**,
-evaluates them with credit-realistic metrics (ROC AUC, KS, calibration, lift), calibrates the best model,
-and serves it through a FastAPI backend with a small web frontend.
+> Predicts an applicant's **probability of default (PD)**, calibrated and explainable, with a model the user can choose at scoring time.
 
-> **Status:** under active construction (portfolio MVP, built in phases). See
-> `.claude/plans/` for the implementation plan.
+<!-- Update <owner> once pushed to GitHub -->
+![CI](https://github.com/<owner>/CreditLens/actions/workflows/ci.yml/badge.svg)
 
-## Data scope
+## What it does
 
-- `application_train.csv` (main table)
-- Aggregated features from `bureau.csv` and `previous_application.csv`
+- **6 models compared** — LogisticRegression (baseline) · RandomForest · XGBoost · LightGBM · CatBoost · Stacking ensemble.
+- **Credit-realistic evaluation** — ROC AUC **plus** KS, probability **calibration** (isotonic), and lift by decile. A 0.74-AUC model with bad PDs is useless for lending; we calibrate.
+- **FastAPI backend** — `/predict` (single applicant) and `/batch_predict` (CSV upload), async, scales horizontally.
+- **Web app** — score one applicant live, switch models, or upload a portfolio CSV.
 
-(The full competition has 7 tables; CreditLens uses these three for a strong, manageable feature set.)
+## Results (held-out test, calibrated)
 
-## Models
+| Model | ROC AUC | KS | ECE (raw → calibrated) |
+|---|---|---|---|
+| **Stacking** | **0.7432** | 0.368 | 0.004 → 0.002 |
+| LightGBM | 0.7429 | 0.368 | 0.331 → **0.002** |
+| XGBoost | 0.7428 | 0.366 | 0.342 → 0.002 |
+| CatBoost | 0.7414 | 0.365 | 0.343 → 0.001 |
+| RandomForest | 0.7350 | 0.355 | 0.277 → 0.003 |
+| LogisticRegression | 0.7276 | 0.340 | 0.353 → 0.002 |
 
-LogisticRegression (baseline) · RandomForest · XGBoost · LightGBM · CatBoost · Stacking ensemble.
+- **Calibration matters most:** raw boosters were badly over-confident (ECE ≈ 0.34); isotonic calibration cuts it to ≈ 0.002 — that's what makes the served PD trustworthy.
+- **Lift:** the riskiest score decile catches **~3.3×** the base default rate.
+- **Honest note on AUC ≈ 0.74:** the served models use a **15-feature contract** the web form can actually supply (see below). That's ~0.02–0.03 below a full 146-feature model — a deliberate trade for an end-to-end, form-servable product. Gradient-boosted trees dominate; the multi-model comparison is partly pedagogical.
 
-> Honest note: gradient-boosted trees dominate this dataset. The multi-model comparison is partly
-> pedagogical — it demonstrates breadth and a fair evaluation harness, not a real selection dilemma.
+## The 15-feature contract
+
+The web form (and `/predict`) collect exactly the 15 features the models train on, so request → model is consistent end-to-end:
+
+```
+ext_source_1/2/3 · credit_to_income · annuity_to_income · age · emp_years
+region_rating · cnt_children · bureau_dpd · bureau_active · bureau_debt
+prev_approval · prev_refused · prev_count
+```
+
+`EXT_SOURCE_1/2/3` (anonymized external credit scores) are the **strongest predictors** but a real applicant can't type them — in production they'd come from a bureau API. The demo exposes them as sliders.
+
+## Architecture
+
+```
+Kaggle CSVs ──> creditlens.data (load, validate, features)
+                     │  build_model_matrix  → 15-feature contract
+                     ▼
+        creditlens.models.registry (6 leakage-safe sklearn Pipelines)
+                     │  GridSearch tuning + StratifiedKFold CV
+                     ▼
+        creditlens.pipeline  (train on full data → isotonic calibrate → save)
+                     │  models/*.joblib + metadata.json
+                     ▼
+        creditlens.serve.api (FastAPI)  ──>  app/CreditLens.html (React)
+           /predict · /batch_predict · /models · /health
+```
 
 ## Quickstart
 
 ```bash
-make install        # install package + dev deps (use a virtualenv)
+make install        # package + dev deps (use a virtualenv / uv)
 make data           # download Kaggle CSVs (needs ~/.kaggle/kaggle.json + accepted comp rules)
-make train          # FE -> CV-train all models -> evaluate -> save best calibrated model
-make eval           # regenerate metrics table + plots
-make serve          # FastAPI + frontend at http://localhost:8000
-make test           # run the test suite
+make train          # FE → tune → train 6 models on full data → calibrate → save to models/
+make serve          # FastAPI + web app at http://localhost:8000
+make test           # pytest (runs on synthetic fixtures, no real data)
+make lint           # ruff
 ```
+
+Then open **http://localhost:8000**: adjust an applicant and watch the calibrated PD/decision update, switch models, or go to **Portfolio** and upload a CSV.
+
+`make serve-prod` runs multiple uvicorn workers (the app is stateless → scales horizontally).
+
+## API
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/predict` | POST | Score one applicant → calibrated PD + band + decision |
+| `/batch_predict` | POST | Upload a CSV → per-row scores + portfolio summary (AUC/KS if `TARGET` present) |
+| `/models` | GET | Per-model metrics (drives the UI selector) |
+| `/health` | GET | Liveness + loaded models |
+
+**Batch CSV columns** (required): `amt_income, amt_credit, amt_annuity, age, emp_years, region_rating, cnt_children, ext_source_1, ext_source_2, ext_source_3, bureau_active, bureau_dpd, bureau_debt, prev_approval, prev_refused, prev_count`. Optional: `SK_ID_CURR`, `name`, `TARGET` (enables AUC/KS + realised-default shading). Generate a sample: `python scripts/make_sample_batch.py`.
+
+## Notebooks
+
+| Notebook | Content |
+|---|---|
+| `01_eda.ipynb` | Target imbalance, missingness, EXT_SOURCE signal, ratios, side-table cardinality, ydata-profiling |
+| `02_features.ipynb` | Feature engineering + leakage/sanity checks |
+| `03_modeling.ipynb` | GridSearch tuning, CV leaderboard, permutation feature importance (plotly) |
+| `04_evaluation.ipynb` | Calibration, reliability/ROC/lift curves |
+| `exp_pca.ipynb` | PCA experiment (negative result — kept out of production) |
 
 ## Project layout
 
 ```
-creditlens/      # python package: data, models, evaluation, serving
-notebooks/       # teaching/EDA notebooks (refactored into the package)
-scripts/         # data download + test-fixture generation
-tests/           # pytest suite (runs on tiny synthetic fixtures in CI)
-app/             # CreditLens.html frontend
+creditlens/      data · models · evaluation · serve · pipeline.py · config.py
+app/             CreditLens.html + React src (ApplicantPage, model.js, PortfolioPage, …)
+notebooks/       EDA → features → modeling → evaluation + experiments
+scripts/         download_data · make_fixtures · make_sample_batch
+tests/           pytest suite (synthetic fixtures; runs in CI without Kaggle data)
 ```
 
-## Metrics
+## Limitations / honest notes
 
-Beyond the competition's ROC AUC, CreditLens reports **KS statistic**, **calibration / reliability**
-(PD must be calibrated for credit decisions), and **gains/lift** by decile.
+- **AUC ceiling ≈ 0.74** from the 15-feature form contract (full features would score higher but aren't form-servable).
+- **Portfolio & Model-card pages** use synthetic data for the demo; only the Applicant page and CSV upload hit the real backend.
+- **Plotly charts** render in VSCode/Jupyter but not static GitHub previews.
+- Kaggle competition data is **not redistributed** (gitignored); reviewers run `make data` with their own token.
+
+## Stack
+
+Python · pandas · scikit-learn · XGBoost · LightGBM · CatBoost · FastAPI · uvicorn · pydantic · React (CDN + Babel) · plotly · pytest · ruff · GitHub Actions.
