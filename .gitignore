@@ -47,3 +47,7 @@ app/sample_applications.csv
 # CatBoost training artifacts
 catboost_info/
 **/catboost_info/
+
+# MLflow tracking
+mlruns/
+mlartifacts/

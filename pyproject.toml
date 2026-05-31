@@ -24,6 +24,7 @@ dependencies = [
     "ydata-profiling>=4.18.4",
     "setuptools<80",
     "plotly>=6.7.0",
+    "python-multipart>=0.0.29",
 ]
 
 [project.optional-dependencies]
@@ -32,6 +33,7 @@ dev = [
     "ruff>=0.4",
     "httpx>=0.27",          # FastAPI TestClient
     "jupyter>=1.0",
+    "mlflow>=3.12.0",
 ]
 
 [tool.setuptools.packages.find]

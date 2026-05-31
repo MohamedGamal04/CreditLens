@@ -1,0 +1,26 @@
+# Keep the image small — ship only code, app, and models.
+.git
+.github
+.venv
+venv
+__pycache__
+**/__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+
+# Data (gitignored, not needed at runtime) and large/dev-only dirs
+data
+notebooks
+reports
+catboost_info
+**/catboost_info
+tests
+scripts
+
+# Misc
+.vscode
+.claude
+*.ipynb
+app/sample_applications.csv
+app/.thumbnail

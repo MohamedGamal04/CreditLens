@@ -1,3 +1,15 @@
+<!-- Hugging Face Space config (also renders as a table on GitHub) -->
+---
+title: CreditLens
+emoji: 💳
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 8000
+pinned: false
+short_description: Credit default-risk scoring — 6 calibrated models + FastAPI + web app
+---
+
 # CreditLens
 
 Credit default-risk modeling on the Kaggle [Home Credit Default Risk](https://www.kaggle.com/competitions/home-credit-default-risk/) dataset — an end-to-end ML project: data → features → 6 tuned & calibrated models → FastAPI serving → an interactive risk-assessment web app.

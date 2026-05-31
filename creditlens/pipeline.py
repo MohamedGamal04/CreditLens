@@ -14,6 +14,7 @@ Run: ``python -m creditlens.pipeline``  (or ``make train``).
 from __future__ import annotations
 
 import json
+import logging
 import time
 
 import joblib
@@ -26,15 +27,42 @@ from creditlens.data.features import MODEL_FEATURES, load_or_build_model_matrix
 from creditlens.evaluation.metrics import summarize
 from creditlens.models.registry import BASE_MODELS, make_pipeline, make_stacking
 
+# MLflow is a dev/training-time dependency. Guarded so the pipeline still runs
+# (and the serving image, which never imports it) does not require it.
+try:
+    import mlflow
+    import mlflow.sklearn
+
+    _MLFLOW = True
+except ImportError:  # pragma: no cover
+    _MLFLOW = False
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+log = logging.getLogger("creditlens.train")
+
 ALL_MODELS = BASE_MODELS + ["stacking"]
+MLFLOW_EXPERIMENT = "creditlens"
 
 
 def _build(name: str):
     return make_stacking() if name == "stacking" else make_pipeline(name)
 
 
-def train_all(*, calibrate: bool = True) -> dict:
-    """Train, calibrate, and save every model; return the metadata payload."""
+def _loggable_params(est) -> dict:
+    """Scalar hyperparameters of the classifier step, for mlflow.log_params."""
+    clf = est.named_steps["clf"] if hasattr(est, "named_steps") and "clf" in est.named_steps else est
+    return {
+        k: v for k, v in clf.get_params().items()
+        if isinstance(v, (int, float, str, bool)) or v is None
+    }
+
+
+def train_all(*, calibrate: bool = True, track: bool = True) -> dict:
+    """Train, calibrate, and save every model; return the metadata payload.
+
+    If ``track`` and MLflow is installed, each model is logged as an MLflow run
+    (params + metrics + the calibrated model artifact) under the ``creditlens`` experiment.
+    """
     mat = load_or_build_model_matrix()
     X, y = mat[MODEL_FEATURES], mat[TARGET]
 
@@ -42,7 +70,12 @@ def train_all(*, calibrate: bool = True) -> dict:
         X, y, test_size=0.30, stratify=y, random_state=RANDOM_SEED)
     X_cal, X_te, y_cal, y_te = train_test_split(
         X_tmp, y_tmp, test_size=0.50, stratify=y_tmp, random_state=RANDOM_SEED)
-    print(f"train {X_tr.shape} | calib {X_cal.shape} | test {X_te.shape}")
+    log.info("train %s | calib %s | test %s", X_tr.shape, X_cal.shape, X_te.shape)
+
+    use_mlflow = track and _MLFLOW
+    if use_mlflow:
+        mlflow.set_experiment(MLFLOW_EXPERIMENT)
+        log.info("mlflow tracking -> experiment '%s'", MLFLOW_EXPERIMENT)
 
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     meta: dict = {}
@@ -71,8 +104,19 @@ def train_all(*, calibrate: bool = True) -> dict:
             "auc_uncalibrated": round(raw["auc"], 4),
             "calibrated": calibrate,
         }
-        print(f"{name:9s} AUC={cal['auc']:.4f} KS={cal['ks']:.4f} "
-              f"ECE {raw['ece']:.4f}->{cal['ece']:.4f}  ({time.time() - t0:.0f}s)")
+        log.info("%-9s AUC=%.4f KS=%.4f ECE %.4f->%.4f (%.0fs)",
+                 name, cal["auc"], cal["ks"], raw["ece"], cal["ece"], time.time() - t0)
+
+        if use_mlflow:
+            with mlflow.start_run(run_name=name):
+                mlflow.set_tag("model", name)
+                mlflow.set_tag("calibrated", calibrate)
+                mlflow.log_params(_loggable_params(est))
+                mlflow.log_metrics({
+                    "auc": cal["auc"], "ks": cal["ks"], "gini": cal["gini"], "ece": cal["ece"],
+                    "auc_uncalibrated": raw["auc"], "ece_uncalibrated": raw["ece"],
+                })
+                mlflow.sklearn.log_model(model, name="model")
 
     payload = {
         "features": MODEL_FEATURES,
@@ -85,7 +129,7 @@ def train_all(*, calibrate: bool = True) -> dict:
         "models": meta,
     }
     (MODELS_DIR / "metadata.json").write_text(json.dumps(payload, indent=2))
-    print(f"\nbest by AUC: {payload['best']}  | saved {len(ALL_MODELS)} models -> {MODELS_DIR}")
+    log.info("best by AUC: %s | saved %d models -> %s", payload["best"], len(ALL_MODELS), MODELS_DIR)
     return payload
 
 

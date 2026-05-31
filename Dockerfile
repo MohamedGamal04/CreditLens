@@ -1,0 +1,33 @@
+# CreditLens — FastAPI + trained models, served by uvicorn.
+#
+# Uses uv + uv.lock so the container installs the EXACT same dependency versions
+# the models were trained with (.venv, Python 3.12) — joblib/sklearn pickles load
+# cleanly. Models are baked in (Kaggle data can't be redistributed): run
+# `.venv/bin/python -m creditlens.pipeline` (make train) before building.
+FROM python:3.12-slim
+
+# uv binary (fast, reads uv.lock for reproducible installs)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+# libgomp1: OpenMP runtime for LightGBM / XGBoost.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+ENV UV_LINK_MODE=copy UV_COMPILE_BYTECODE=1
+
+# Install runtime deps only (exact lock, no dev: no mlflow/pytest in the image).
+COPY pyproject.toml uv.lock README.md ./
+COPY creditlens ./creditlens
+RUN uv sync --frozen --no-dev --no-editable
+
+# App assets + trained model artifacts.
+COPY app ./app
+COPY models ./models
+
+ENV PORT=8000
+EXPOSE 8000
+
+# Honor an injected $PORT (HF Spaces / Render / Cloud Run) with a sane default.
+CMD ["sh", "-c", ".venv/bin/uvicorn creditlens.serve.api:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"]
