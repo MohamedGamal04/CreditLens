@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import io
 import json
+import logging
+import time
 from contextlib import asynccontextmanager
 
 import joblib
@@ -38,6 +40,9 @@ from creditlens.data.features import (
 )
 from creditlens.evaluation.metrics import summarize
 from creditlens.serve.schema import PredictRequest, PredictResponse
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+log = logging.getLogger("creditlens.api")
 
 BATCH_ROW_CAP = 1000  # max scored rows returned to the UI
 MAX_BATCH_ROWS = 100_000  # reject larger uploads (protect the worker)
@@ -60,6 +65,10 @@ def _load() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _load()
+    if MODELS:
+        log.info("startup: loaded %d models %s", len(MODELS), sorted(MODELS))
+    else:
+        log.warning("startup: no models found in %s — run `make train`", MODELS_DIR)
     yield
     MODELS.clear()
     METADATA.clear()
@@ -81,6 +90,7 @@ def _require_model(name: str):
     key = ALIAS.get(name, name)
     model = MODELS.get(key)
     if model is None:
+        log.warning("model '%s' unavailable (loaded: %s)", name, sorted(MODELS))
         raise HTTPException(
             503 if not MODELS else 400,
             f"Model '{name}' unavailable. Loaded: {sorted(MODELS)} (run `make train`).",
@@ -146,10 +156,13 @@ async def models() -> dict:
 
 @app.post("/predict", response_model=PredictResponse)
 async def predict(req: PredictRequest) -> PredictResponse:
+    t0 = time.perf_counter()
     model, key = _require_model(req.model)
     feats = applicant_to_features(req.applicant.model_dump())
     proba = await run_in_threadpool(_predict_one, model, feats)
     band = _band(proba, req.low, req.high)
+    log.info("predict model=%s pd=%.4f band=%s (%.1fms)",
+             key, proba, band, (time.perf_counter() - t0) * 1000)
     return PredictResponse(
         probability=proba, band=band, decision=_DECISION[band], model=key, features=feats,
     )
@@ -167,24 +180,31 @@ async def batch_predict(
     Optional: ``SK_ID_CURR`` / ``name`` (display), ``TARGET`` (enables AUC/KS + realised
     defaults). Returns per-row PD/band/decision + a portfolio summary.
     """
+    t0 = time.perf_counter()
     model_obj, key = _require_model(model)
 
     raw = await file.read()
     if len(raw) > MAX_UPLOAD_BYTES:
+        log.warning("batch upload rejected: %d bytes > limit", len(raw))
         raise HTTPException(413, f"File too large (> {MAX_UPLOAD_BYTES // (1024 * 1024)} MB).")
     try:
         df = pd.read_csv(io.BytesIO(raw))
     except Exception as exc:  # noqa: BLE001
+        log.warning("batch CSV parse error: %s", exc)
         raise HTTPException(400, f"Could not parse CSV: {exc}") from exc
 
     missing = [c for c in APPLICANT_COLUMNS if c not in df.columns]
     if missing:
+        log.warning("batch CSV missing columns: %s", missing)
         raise HTTPException(400, f"CSV missing required columns: {missing}")
     if len(df) > MAX_BATCH_ROWS:
         raise HTTPException(413, f"Too many rows ({len(df)} > {MAX_BATCH_ROWS}).")
 
     result = await run_in_threadpool(_score_batch, model_obj, df, low, high)
     result["model"] = key
+    log.info("batch_predict model=%s rows=%d bands=%s (%.0fms)",
+             key, result["summary"]["n"], result["summary"]["bands"],
+             (time.perf_counter() - t0) * 1000)
     return result
 
 

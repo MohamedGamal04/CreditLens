@@ -52,7 +52,10 @@ function App() {
       fetch('/predict', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
         body: JSON.stringify({ applicant: sanitize(applicant), model, low: thresholds.low, high: thresholds.high }),
-      }).then(r => (r.ok ? r.json() : null)).then(d => setApiScore(d)).catch(() => {});
+      })
+        .then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+        .then(d => { setApiScore(d); console.debug('[CreditLens] /predict', model, 'PD=' + d.probability.toFixed(4), d.band); })
+        .catch(e => { if (e.name !== 'AbortError') console.warn('[CreditLens] /predict failed:', e.message); });
     }, 180);
     return () => { clearTimeout(id); ctrl.abort(); };
   }, [applicant, model, t.lowCut, t.highCut]);
@@ -77,11 +80,17 @@ function App() {
     if (!batchFile) return;
     const ctrl = new AbortController();
     const fd = new FormData(); fd.append('file', batchFile);
+    console.info('[CreditLens] /batch_predict uploading', batchFile.name, 'model=' + model);
     fetch(`/batch_predict?model=${model}&low=${thresholds.low}&high=${thresholds.high}`,
       { method: 'POST', body: fd, signal: ctrl.signal })
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (d && d.rows) setPortfolio(d.rows.map(x => ({ ...x, real: true }))); })
-      .catch(() => {});
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+      .then(d => {
+        if (d && d.rows) {
+          setPortfolio(d.rows.map(x => ({ ...x, real: true })));
+          console.info('[CreditLens] /batch_predict scored', d.summary.n, 'rows', d.summary);
+        }
+      })
+      .catch(e => { if (e.name !== 'AbortError') console.error('[CreditLens] /batch_predict failed:', e.message); });
     return () => ctrl.abort();
   }, [batchFile, model, t.lowCut, t.highCut]);
 

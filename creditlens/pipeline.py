@@ -50,7 +50,8 @@ def _build(name: str):
 
 def _loggable_params(est) -> dict:
     """Scalar hyperparameters of the classifier step, for mlflow.log_params."""
-    clf = est.named_steps["clf"] if hasattr(est, "named_steps") and "clf" in est.named_steps else est
+    has_clf = hasattr(est, "named_steps") and "clf" in est.named_steps
+    clf = est.named_steps["clf"] if has_clf else est
     return {
         k: v for k, v in clf.get_params().items()
         if isinstance(v, (int, float, str, bool)) or v is None
@@ -129,7 +130,8 @@ def train_all(*, calibrate: bool = True, track: bool = True) -> dict:
         "models": meta,
     }
     (MODELS_DIR / "metadata.json").write_text(json.dumps(payload, indent=2))
-    log.info("best by AUC: %s | saved %d models -> %s", payload["best"], len(ALL_MODELS), MODELS_DIR)
+    log.info("best by AUC: %s | saved %d models -> %s",
+             payload["best"], len(ALL_MODELS), MODELS_DIR)
     return payload
 
 
