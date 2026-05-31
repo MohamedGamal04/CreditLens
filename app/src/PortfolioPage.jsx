@@ -11,7 +11,8 @@ function StatTile({ label, value, sub, accent }) {
   );
 }
 
-function UploadState({ onLoad }) {
+function UploadState({ onLoad, onUpload }) {
+  const fileRef = React.useRef(null);
   const [stage, setStage] = useState('idle'); // idle | parsing | done
   const [pctp, setPctp] = useState(0);
   const run = () => {
@@ -29,13 +30,23 @@ function UploadState({ onLoad }) {
         <p className="muted" style={{ fontSize: 14, margin: 0 }}>Upload a CSV of applications to assess default risk across the book at once.</p>
       </div>
       {stage !== 'parsing' ? (
-        <div className="dropzone" onClick={run}>
+        <div className="dropzone" onClick={() => fileRef.current && fileRef.current.click()}>
+          <input ref={fileRef} type="file" accept=".csv" style={{ display: 'none' }}
+            onChange={e => { const f = e.target.files[0]; if (f && onUpload) onUpload(f); }} />
           <div style={{ width: 56, height: 56, borderRadius: 14, background: 'var(--blue-soft)', color: 'var(--blue-700)', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>
             <I name="upload" size={26} />
           </div>
-          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 5 }}>Drop applications.csv here or click to browse</div>
-          <div className="muted" style={{ fontSize: 12.5 }}>Expects Home Credit columns: SK_ID_CURR, AMT_INCOME_TOTAL, AMT_CREDIT, EXT_SOURCE_1–3 …</div>
-          <div style={{ marginTop: 18 }}><span className="btn btn-primary" style={{ pointerEvents: 'none' }}><I name="bolt" size={15} />Load sample batch · 240 applications</span></div>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 5 }}>Click to upload applications.csv → POST /batch_predict</div>
+          <div className="muted" style={{ fontSize: 12, lineHeight: 1.5, maxWidth: 560, margin: '0 auto' }}>
+            Required columns: amt_income, amt_credit, amt_annuity, age, emp_years, region_rating,
+            cnt_children, ext_source_1, ext_source_2, ext_source_3, bureau_active, bureau_dpd,
+            bureau_debt, prev_approval, prev_refused, prev_count.
+            <br />Optional: SK_ID_CURR, name, TARGET (enables AUC/KS).
+          </div>
+          <div style={{ marginTop: 18 }}>
+            <button className="btn btn-primary" onClick={e => { e.stopPropagation(); run(); }}>
+              <I name="bolt" size={15} />Load synthetic sample · 240</button>
+          </div>
         </div>
       ) : (
         <div className="card card-pad" style={{ textAlign: 'center', padding: '44px' }}>
@@ -48,16 +59,19 @@ function UploadState({ onLoad }) {
   );
 }
 
-function PortfolioPage({ portfolio, loadPortfolio, thresholds, model, inspect }) {
+function PortfolioPage({ portfolio, loadPortfolio, onUpload, thresholds, model, inspect }) {
   // NOTE: all hooks must run unconditionally (before any early return) so the
   // hook order is stable across the no-data → data transition.
   const [sortKey, setSortKey] = useState('prob');
   const [sortDir, setSortDir] = useState(-1);
   const [filter, setFilter] = useState('all');
 
-  // re-score the batch with the active model (calibration + population noise)
-  const scored = useMemo(() => portfolio && CL.scoreRows(portfolio, model),
-    [portfolio, model, thresholds.low, thresholds.high]);
+  // Real backend batch (rows already carry calibrated prob/band) -> use as-is.
+  // Synthetic sample -> re-score locally with the active model.
+  const scored = useMemo(() => {
+    if (!portfolio) return null;
+    return portfolio[0] && portfolio[0].real ? portfolio : CL.scoreRows(portfolio, model);
+  }, [portfolio, model, thresholds.low, thresholds.high]);
   const counts = useMemo(() => scored && CL.bandCounts(scored), [scored]);
   const hist = useMemo(() => scored && CL.histogram(scored, 20), [scored]);
   const ks = useMemo(() => scored && CL.ksCurve(scored), [scored]);
@@ -71,7 +85,7 @@ function PortfolioPage({ portfolio, loadPortfolio, thresholds, model, inspect })
     return r.slice(0, 60);
   }, [scored, sortKey, sortDir, filter]);
 
-  if (!portfolio) return <UploadState onLoad={loadPortfolio} />;
+  if (!portfolio) return <UploadState onLoad={loadPortfolio} onUpload={onUpload} />;
 
   const m = CL.getModel(model);
   const total = scored.length;

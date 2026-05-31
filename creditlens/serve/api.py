@@ -9,18 +9,27 @@ Run: ``uvicorn creditlens.serve.api:app --reload --port 8000`` (or ``make serve`
 
 from __future__ import annotations
 
+import io
 import json
 from contextlib import asynccontextmanager
 
 import joblib
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from creditlens.config import APP_DIR, MODELS_DIR
-from creditlens.data.features import MODEL_FEATURES, applicant_to_features
+from creditlens.data.features import (
+    APPLICANT_COLUMNS,
+    MODEL_FEATURES,
+    applicant_to_features,
+    applicants_frame_to_features,
+)
+from creditlens.evaluation.metrics import summarize
 from creditlens.serve.schema import PredictRequest, PredictResponse
+
+BATCH_ROW_CAP = 1000  # max scored rows returned to the UI
 
 MODELS: dict = {}
 METADATA: dict = {}
@@ -89,6 +98,66 @@ def predict(req: PredictRequest) -> PredictResponse:
         model=key,
         features=feats,
     )
+
+
+@app.post("/batch_predict")
+async def batch_predict(
+    file: UploadFile = File(...),
+    model: str = "lgbm",
+    low: float = 0.06,
+    high: float = 0.15,
+) -> dict:
+    """Score an uploaded CSV of applicants. Required columns: see APPLICANT_COLUMNS.
+
+    Optional: ``SK_ID_CURR`` / ``name`` (display), ``TARGET`` (enables AUC/KS + realised
+    defaults). Returns per-row PD/band/decision + a portfolio summary.
+    """
+    key = ALIAS.get(model, model)
+    m = MODELS.get(key)
+    if m is None:
+        raise HTTPException(503 if not MODELS else 400,
+                            f"Model '{model}' unavailable. Loaded: {sorted(MODELS)}.")
+
+    try:
+        df = pd.read_csv(io.BytesIO(await file.read()))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"Could not parse CSV: {exc}") from exc
+
+    missing = [c for c in APPLICANT_COLUMNS if c not in df.columns]
+    if missing:
+        raise HTTPException(400, f"CSV missing required columns: {missing}")
+
+    proba = m.predict_proba(applicants_frame_to_features(df))[:, 1]
+    bands = [_band(float(p), low, high) for p in proba]
+
+    has_target = "TARGET" in df.columns and df["TARGET"].nunique() > 1
+    ids = df["SK_ID_CURR"] if "SK_ID_CURR" in df.columns else df.index
+    names = df["name"] if "name" in df.columns else None
+
+    rows = []
+    for i in range(len(df)):
+        rows.append({
+            "id": int(ids.iloc[i]) if hasattr(ids, "iloc") else int(ids[i]),
+            "name": str(names.iloc[i]) if names is not None else f"APP-{int(ids.iloc[i]) if hasattr(ids,'iloc') else i}",
+            "credit": float(df["amt_credit"].iloc[i]),
+            "ext2": float(df["ext_source_2"].iloc[i]),
+            "prob": float(proba[i]),
+            "band": bands[i],
+            "decision": _DECISION[bands[i]],
+            "defaulted": int(df["TARGET"].iloc[i]) if has_target else None,
+            "applicant": {c: float(df[c].iloc[i]) for c in APPLICANT_COLUMNS},
+        })
+
+    summary = {
+        "n": len(df),
+        "avg_pd": float(proba.mean()),
+        "exposure": float(df["amt_credit"].sum()),
+        "bands": {b: bands.count(b) for b in ("low", "med", "high")},
+    }
+    if has_target:
+        summary.update({k: round(v, 4) for k, v in summarize(df["TARGET"], proba).items()})
+
+    return {"model": key, "summary": summary, "rows": rows[:BATCH_ROW_CAP]}
 
 
 # Serve the frontend (app/CreditLens.html + app/src/*) at the root.

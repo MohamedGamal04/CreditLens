@@ -40,3 +40,6 @@ reports/
 
 # Design bundle internals we don't need to track (keep CreditLens.html + src)
 app/.thumbnail
+
+# Sample batch CSV (real-data-derived; regenerate via scripts/make_sample_batch.py)
+app/sample_applications.csv

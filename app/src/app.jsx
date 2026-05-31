@@ -28,6 +28,7 @@ function App() {
   const [route, setRoute] = useState(() => (location.hash.replace('#', '') || 'applicant'));
   const [applicant, setApplicant] = useState({ ...CL.DEFAULT_APPLICANT });
   const [portfolio, setPortfolio] = useState(null);
+  const [batchFile, setBatchFile] = useState(null);
   const [model, setModel] = useState('lgbm');
 
   // thresholds from tweaks → into the model
@@ -68,7 +69,21 @@ function App() {
   }, []);
 
   const inspect = app => { setApplicant({ ...CL.DEFAULT_APPLICANT, ...app }); go('explain'); };
-  const loadPortfolio = () => setPortfolio(CL.makePortfolio(240, 42));
+  const loadPortfolio = () => { setBatchFile(null); setPortfolio(CL.makePortfolio(240, 42)); };
+  const uploadBatch = file => setBatchFile(file);
+
+  // Real batch scoring: POST the uploaded CSV to the backend; re-score on model/threshold change.
+  useEff(() => {
+    if (!batchFile) return;
+    const ctrl = new AbortController();
+    const fd = new FormData(); fd.append('file', batchFile);
+    fetch(`/batch_predict?model=${model}&low=${thresholds.low}&high=${thresholds.high}`,
+      { method: 'POST', body: fd, signal: ctrl.signal })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d && d.rows) setPortfolio(d.rows.map(x => ({ ...x, real: true }))); })
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, [batchFile, model, t.lowCut, t.highCut]);
 
   const [title, sub] = TITLES[route];
 
@@ -122,7 +137,7 @@ function App() {
 
         {route === 'applicant' && <ApplicantPage applicant={applicant} setApplicant={setApplicant} result={result} gaugeVariant={t.gauge} thresholds={thresholds} model={model} go={go} />}
         {route === 'explain'   && <ExplanationPage applicant={applicant} result={result} thresholds={thresholds} model={model} go={go} />}
-        {route === 'portfolio' && <PortfolioPage portfolio={portfolio} loadPortfolio={loadPortfolio} thresholds={thresholds} model={model} inspect={inspect} />}
+        {route === 'portfolio' && <PortfolioPage portfolio={portfolio} loadPortfolio={loadPortfolio} onUpload={uploadBatch} thresholds={thresholds} model={model} inspect={inspect} />}
         {route === 'modelcard' && <ModelCardPage thresholds={thresholds} model={model} setModel={setModel} valSet={valSet} board={board} />}
       </main>
 

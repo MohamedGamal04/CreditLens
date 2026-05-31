@@ -157,6 +157,39 @@ def applicant_to_features(a: dict) -> dict:
     }
 
 
+# Raw applicant columns a batch CSV must provide (same as the web form).
+APPLICANT_COLUMNS = [
+    "amt_income", "amt_credit", "amt_annuity", "age", "emp_years",
+    "region_rating", "cnt_children", "ext_source_1", "ext_source_2", "ext_source_3",
+    "bureau_active", "bureau_dpd", "bureau_debt", "prev_approval", "prev_refused", "prev_count",
+]
+
+
+def applicants_frame_to_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Vectorized raw-applicant frame -> 15-feature contract (for batch scoring).
+
+    Same mapping as ``applicant_to_features`` but over a whole DataFrame.
+    """
+    income = df["amt_income"].clip(lower=1.0)
+    out = pd.DataFrame(index=df.index)
+    out["ext_source_1"] = df["ext_source_1"]
+    out["ext_source_2"] = df["ext_source_2"]
+    out["ext_source_3"] = df["ext_source_3"]
+    out["credit_to_income"] = df["amt_credit"] / income
+    out["annuity_to_income"] = df["amt_annuity"] / income
+    out["age"] = df["age"]
+    out["emp_years"] = df["emp_years"]
+    out["region_rating"] = df["region_rating"]
+    out["cnt_children"] = df["cnt_children"]
+    out["bureau_dpd"] = df["bureau_dpd"]
+    out["bureau_active"] = df["bureau_active"]
+    out["bureau_debt"] = df["bureau_debt"]
+    out["prev_approval"] = df["prev_approval"]
+    out["prev_refused"] = df["prev_refused"]
+    out["prev_count"] = df["prev_count"]
+    return out[MODEL_FEATURES]
+
+
 def _bureau_contract(bureau: pd.DataFrame) -> pd.DataFrame:
     """Bureau aggregates for the contract: active count, DPD count, total debt."""
     b = bureau.copy()
