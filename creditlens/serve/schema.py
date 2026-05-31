@@ -44,8 +44,8 @@ class Applicant(BaseModel):
 class PredictRequest(BaseModel):
     applicant: Applicant
     model: ModelKey = "lgbm"
-    low: float = Field(0.06, ge=0, le=1, description="low/medium band cut")
-    high: float = Field(0.15, ge=0, le=1, description="medium/high band cut")
+    low: float | None = Field(None, ge=0, le=1, description="low/medium band cut")
+    high: float | None = Field(None, ge=0, le=1, description="medium/high band cut")
 
 
 class PredictResponse(BaseModel):

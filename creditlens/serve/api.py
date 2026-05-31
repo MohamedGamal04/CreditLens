@@ -48,6 +48,9 @@ BATCH_ROW_CAP = 1000  # max scored rows returned to the UI
 MAX_BATCH_ROWS = 100_000  # reject larger uploads (protect the worker)
 MAX_UPLOAD_BYTES = 32 * 1024 * 1024  # 32 MB
 
+DEFAULT_LOW = 0.06   # fallback band cuts when metadata has none
+DEFAULT_HIGH = 0.15
+
 MODELS: dict = {}
 METADATA: dict = {}
 ALIAS = {"stack": "stacking"}  # frontend key -> saved artifact name
@@ -58,6 +61,10 @@ def _load() -> None:
     meta_path = MODELS_DIR / "metadata.json"
     if meta_path.exists():
         METADATA.update(json.loads(meta_path.read_text()))
+        bands = METADATA.get("bands")
+        if bands:
+            global DEFAULT_LOW, DEFAULT_HIGH
+            DEFAULT_LOW, DEFAULT_HIGH = bands["low"], bands["high"]
     for path in MODELS_DIR.glob("*.joblib"):
         MODELS[path.stem] = joblib.load(path)
 
@@ -160,7 +167,9 @@ async def predict(req: PredictRequest) -> PredictResponse:
     model, key = _require_model(req.model)
     feats = applicant_to_features(req.applicant.model_dump())
     proba = await run_in_threadpool(_predict_one, model, feats)
-    band = _band(proba, req.low, req.high)
+    low = req.low if req.low is not None else DEFAULT_LOW
+    high = req.high if req.high is not None else DEFAULT_HIGH
+    band = _band(proba, low, high)
     log.info("predict model=%s pd=%.4f band=%s (%.1fms)",
              key, proba, band, (time.perf_counter() - t0) * 1000)
     return PredictResponse(
@@ -172,14 +181,16 @@ async def predict(req: PredictRequest) -> PredictResponse:
 async def batch_predict(
     file: UploadFile = File(...),
     model: str = "lgbm",
-    low: float = 0.06,
-    high: float = 0.15,
+    low: float | None = None,
+    high: float | None = None,
 ) -> dict:
     """Score an uploaded CSV of applicants. Required columns: see APPLICANT_COLUMNS.
 
     Optional: ``SK_ID_CURR`` / ``name`` (display), ``TARGET`` (enables AUC/KS + realised
     defaults). Returns per-row PD/band/decision + a portfolio summary.
     """
+    low = low if low is not None else DEFAULT_LOW
+    high = high if high is not None else DEFAULT_HIGH
     t0 = time.perf_counter()
     model_obj, key = _require_model(model)
 

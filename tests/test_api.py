@@ -97,3 +97,22 @@ def test_batch_predict_missing_columns_400(client):
     r = client.post("/batch_predict?model=logreg",
                     files={"file": ("a.csv", io.BytesIO(bad), "text/csv")})
     assert r.status_code == 400
+
+
+def test_predict_uses_metadata_bands(matrix):
+    model = make_pipeline("logreg").fit(matrix[MODEL_FEATURES], matrix[TARGET])
+    api.MODELS.clear()
+    api.MODELS["logreg"] = model
+    api.METADATA.clear()
+    api.METADATA.update({"bands": {"low": 0.99, "high": 0.995}})
+    api.DEFAULT_LOW, api.DEFAULT_HIGH = 0.99, 0.995  # mimic _load()
+    try:
+        c = TestClient(api.app)
+        r = c.post("/predict", json={"applicant": VALID_APPLICANT, "model": "logreg"})
+        assert r.status_code == 200
+        # with an absurdly high low-cut, a typical PD lands in the "low" band
+        assert r.json()["band"] == "low"
+    finally:
+        api.MODELS.clear()
+        api.METADATA.clear()
+        api.DEFAULT_LOW, api.DEFAULT_HIGH = 0.06, 0.15
