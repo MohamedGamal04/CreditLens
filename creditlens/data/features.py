@@ -10,6 +10,11 @@ pipeline).
 
 Leakage note: nothing here uses ``TARGET``. Aggregations are within a single
 applicant's own history, so they are safe to compute on the full frame.
+
+Scope note: ``build_features`` and its helpers (``add_application_features``,
+``aggregate_bureau``, ``aggregate_previous``) produce the rich EDA frame used only by
+``notebooks/02_features.ipynb``. The **served** path uses ``build_model_matrix`` below
+(the 15-feature contract) — not ``build_features``.
 """
 
 from __future__ import annotations

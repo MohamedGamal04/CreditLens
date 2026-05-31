@@ -245,13 +245,12 @@
 
   // ---- default applicant (a clean, low-risk Home Credit profile) -------------
   const DEFAULT_APPLICANT = {
-    contract: 'Cash loans',
     amt_income: 162000, amt_credit: 640000, amt_annuity: 31500,
     ext_source_1: 0.42, ext_source_2: 0.48, ext_source_3: 0.43,
     age: 36, emp_years: 3.5, region_rating: 2, cnt_children: 1,
     bureau_dpd: 0, bureau_active: 2, bureau_debt: 165000,
     prev_approval: 0.58, prev_refused: 1, prev_count: 4,
-    education: 'Secondary / secondary special', gender: 'F',
+    gender: 'F',
   };
 
   window.CL = {

@@ -171,7 +171,7 @@ function sanitize(a) {
   const n = (v, d) => (v === '' || v == null || isNaN(v)) ? d : +v;
   const D = CL.DEFAULT_APPLICANT;
   return {
-    contract: a.contract, education: a.education, gender: a.gender,
+    gender: a.gender,
     amt_income: Math.max(1, n(a.amt_income, D.amt_income)),
     amt_credit: n(a.amt_credit, D.amt_credit),
     amt_annuity: n(a.amt_annuity, D.amt_annuity),

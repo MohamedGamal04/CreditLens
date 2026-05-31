@@ -1,7 +1,7 @@
 """Pydantic request/response models for the /predict API.
 
-The request mirrors the frontend applicant form (app/src/model.js DEFAULT_APPLICANT);
-``contract`` / ``education`` are accepted but unused by the 15-feature model.
+The request mirrors the frontend applicant form (app/src/model.js DEFAULT_APPLICANT) —
+exactly the 15 features the served models use.
 """
 
 from __future__ import annotations
@@ -36,9 +36,6 @@ class Applicant(BaseModel):
     prev_approval: float = Field(ge=0, le=1, examples=[0.58])
     prev_refused: int = Field(ge=0, examples=[1])
     prev_count: int = Field(ge=0, examples=[4])
-    # optional / unused-by-model
-    contract: str | None = None
-    education: str | None = None
 
 
 class PredictRequest(BaseModel):
