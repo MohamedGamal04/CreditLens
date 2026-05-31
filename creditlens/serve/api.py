@@ -1,8 +1,16 @@
 """FastAPI app: serve the calibrated models + the CreditLens frontend.
 
-All 6 models are loaded at startup (the UI lets the user pick one). ``/predict`` derives
-the 15-feature contract from a raw applicant payload, scores it with the chosen model, and
-returns a calibrated PD + risk band + decision. ``/models`` exposes the per-model metrics.
+All 6 models are loaded once at startup (the UI lets the user pick one). ``/predict``
+scores a single applicant; ``/batch_predict`` scores an uploaded CSV; ``/models`` exposes
+per-model metrics.
+
+Scalability / concurrency:
+- Routes are ``async``; the **blocking, CPU-bound** model inference runs in a threadpool
+  (``run_in_threadpool``) so a slow prediction never blocks the event loop.
+- The app is **stateless** (models are read-only, loaded per worker) → scale horizontally:
+  ``uvicorn creditlens.serve.api:app --workers N`` (or ``make serve-prod``).
+- Inputs are bounded: upload size (``MAX_UPLOAD_BYTES``) and row count (``MAX_BATCH_ROWS``);
+  only ``BATCH_ROW_CAP`` rows are returned to the UI (summary is computed over all rows).
 
 Run: ``uvicorn creditlens.serve.api:app --reload --port 8000`` (or ``make serve``).
 """
@@ -14,8 +22,10 @@ import json
 from contextlib import asynccontextmanager
 
 import joblib
+import numpy as np
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -30,6 +40,8 @@ from creditlens.evaluation.metrics import summarize
 from creditlens.serve.schema import PredictRequest, PredictResponse
 
 BATCH_ROW_CAP = 1000  # max scored rows returned to the UI
+MAX_BATCH_ROWS = 100_000  # reject larger uploads (protect the worker)
+MAX_UPLOAD_BYTES = 32 * 1024 * 1024  # 32 MB
 
 MODELS: dict = {}
 METADATA: dict = {}
@@ -37,7 +49,7 @@ ALIAS = {"stack": "stacking"}  # frontend key -> saved artifact name
 
 
 def _load() -> None:
-    """Load metadata + every saved model into memory."""
+    """Load metadata + every saved model into memory (once per worker)."""
     meta_path = MODELS_DIR / "metadata.json"
     if meta_path.exists():
         METADATA.update(json.loads(meta_path.read_text()))
@@ -56,6 +68,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="CreditLens", version="0.1.0", lifespan=lifespan)
 
 
+# --- helpers -----------------------------------------------------------------
 def _band(pd_: float, low: float, high: float) -> str:
     return "low" if pd_ < low else ("med" if pd_ < high else "high")
 
@@ -63,13 +76,67 @@ def _band(pd_: float, low: float, high: float) -> str:
 _DECISION = {"low": "approve", "med": "review", "high": "decline"}
 
 
+def _require_model(name: str):
+    """Resolve a model key (with 'stack' alias) or raise 400/503."""
+    key = ALIAS.get(name, name)
+    model = MODELS.get(key)
+    if model is None:
+        raise HTTPException(
+            503 if not MODELS else 400,
+            f"Model '{name}' unavailable. Loaded: {sorted(MODELS)} (run `make train`).",
+        )
+    return model, key
+
+
+def _predict_one(model, feats: dict) -> float:
+    """CPU-bound: score one applicant. Runs in a threadpool."""
+    row = pd.DataFrame([feats])[MODEL_FEATURES]
+    return float(model.predict_proba(row)[:, 1][0])
+
+
+def _score_batch(model, df: pd.DataFrame, low: float, high: float) -> dict:
+    """CPU-bound: vectorized scoring of a whole frame. Runs in a threadpool."""
+    proba = model.predict_proba(applicants_frame_to_features(df))[:, 1]
+    bands = np.where(proba < low, "low", np.where(proba < high, "med", "high"))
+
+    has_target = "TARGET" in df.columns and df["TARGET"].nunique() > 1
+    ids = df["SK_ID_CURR"].astype(int).tolist() if "SK_ID_CURR" in df.columns else list(range(len(df)))
+    names = df["name"].astype(str).tolist() if "name" in df.columns else [f"APP-{i}" for i in ids]
+    credit = df["amt_credit"].astype(float).tolist()
+    ext2 = df["ext_source_2"].astype(float).tolist()
+    targets = df["TARGET"].astype(int).tolist() if has_target else None
+    applicants = df[APPLICANT_COLUMNS].astype(float).to_dict("records")
+
+    cap = min(len(df), BATCH_ROW_CAP)
+    rows = [
+        {
+            "id": ids[i], "name": names[i], "credit": credit[i], "ext2": ext2[i],
+            "prob": float(proba[i]), "band": bands[i], "decision": _DECISION[bands[i]],
+            "defaulted": targets[i] if has_target else None,
+            "applicant": applicants[i],
+        }
+        for i in range(cap)
+    ]
+
+    summary = {
+        "n": int(len(df)),
+        "avg_pd": float(proba.mean()),
+        "exposure": float(df["amt_credit"].sum()),
+        "bands": {b: int((bands == b).sum()) for b in ("low", "med", "high")},
+    }
+    if has_target:
+        summary.update({k: round(v, 4) for k, v in summarize(df["TARGET"], proba).items()})
+    return {"summary": summary, "rows": rows}
+
+
+# --- routes ------------------------------------------------------------------
 @app.get("/health")
-def health() -> dict:
+async def health() -> dict:
     return {"status": "ok", "models_loaded": sorted(MODELS)}
 
 
 @app.get("/models")
-def models() -> dict:
+async def models() -> dict:
     """Per-model metrics for the UI selector (AUC/KS/ECE)."""
     if not METADATA:
         raise HTTPException(503, "No metadata. Run `make train` first.")
@@ -77,26 +144,13 @@ def models() -> dict:
 
 
 @app.post("/predict", response_model=PredictResponse)
-def predict(req: PredictRequest) -> PredictResponse:
-    key = ALIAS.get(req.model, req.model)
-    model = MODELS.get(key)
-    if model is None:
-        raise HTTPException(
-            503 if not MODELS else 400,
-            f"Model '{req.model}' unavailable. Loaded: {sorted(MODELS)} (run `make train`).",
-        )
-
+async def predict(req: PredictRequest) -> PredictResponse:
+    model, key = _require_model(req.model)
     feats = applicant_to_features(req.applicant.model_dump())
-    row = pd.DataFrame([feats])[MODEL_FEATURES]
-    proba = float(model.predict_proba(row)[:, 1][0])
+    proba = await run_in_threadpool(_predict_one, model, feats)
     band = _band(proba, req.low, req.high)
-
     return PredictResponse(
-        probability=proba,
-        band=band,
-        decision=_DECISION[band],
-        model=key,
-        features=feats,
+        probability=proba, band=band, decision=_DECISION[band], model=key, features=feats,
     )
 
 
@@ -112,59 +166,32 @@ async def batch_predict(
     Optional: ``SK_ID_CURR`` / ``name`` (display), ``TARGET`` (enables AUC/KS + realised
     defaults). Returns per-row PD/band/decision + a portfolio summary.
     """
-    key = ALIAS.get(model, model)
-    m = MODELS.get(key)
-    if m is None:
-        raise HTTPException(503 if not MODELS else 400,
-                            f"Model '{model}' unavailable. Loaded: {sorted(MODELS)}.")
+    model_obj, key = _require_model(model)
 
+    raw = await file.read()
+    if len(raw) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, f"File too large (> {MAX_UPLOAD_BYTES // (1024 * 1024)} MB).")
     try:
-        df = pd.read_csv(io.BytesIO(await file.read()))
+        df = pd.read_csv(io.BytesIO(raw))
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, f"Could not parse CSV: {exc}") from exc
 
     missing = [c for c in APPLICANT_COLUMNS if c not in df.columns]
     if missing:
         raise HTTPException(400, f"CSV missing required columns: {missing}")
+    if len(df) > MAX_BATCH_ROWS:
+        raise HTTPException(413, f"Too many rows ({len(df)} > {MAX_BATCH_ROWS}).")
 
-    proba = m.predict_proba(applicants_frame_to_features(df))[:, 1]
-    bands = [_band(float(p), low, high) for p in proba]
-
-    has_target = "TARGET" in df.columns and df["TARGET"].nunique() > 1
-    ids = df["SK_ID_CURR"] if "SK_ID_CURR" in df.columns else df.index
-    names = df["name"] if "name" in df.columns else None
-
-    rows = []
-    for i in range(len(df)):
-        rows.append({
-            "id": int(ids.iloc[i]) if hasattr(ids, "iloc") else int(ids[i]),
-            "name": str(names.iloc[i]) if names is not None else f"APP-{int(ids.iloc[i]) if hasattr(ids,'iloc') else i}",
-            "credit": float(df["amt_credit"].iloc[i]),
-            "ext2": float(df["ext_source_2"].iloc[i]),
-            "prob": float(proba[i]),
-            "band": bands[i],
-            "decision": _DECISION[bands[i]],
-            "defaulted": int(df["TARGET"].iloc[i]) if has_target else None,
-            "applicant": {c: float(df[c].iloc[i]) for c in APPLICANT_COLUMNS},
-        })
-
-    summary = {
-        "n": len(df),
-        "avg_pd": float(proba.mean()),
-        "exposure": float(df["amt_credit"].sum()),
-        "bands": {b: bands.count(b) for b in ("low", "med", "high")},
-    }
-    if has_target:
-        summary.update({k: round(v, 4) for k, v in summarize(df["TARGET"], proba).items()})
-
-    return {"model": key, "summary": summary, "rows": rows[:BATCH_ROW_CAP]}
+    result = await run_in_threadpool(_score_batch, model_obj, df, low, high)
+    result["model"] = key
+    return result
 
 
 # Serve the frontend (app/CreditLens.html + app/src/*) at the root.
 if APP_DIR.exists():
 
     @app.get("/")
-    def index() -> FileResponse:
+    async def index() -> FileResponse:
         return FileResponse(APP_DIR / "CreditLens.html")
 
     app.mount("/", StaticFiles(directory=APP_DIR), name="app")

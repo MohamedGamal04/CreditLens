@@ -15,8 +15,11 @@ train:             ## Run full pipeline: FE -> CV-train all models -> eval -> sa
 eval:              ## Regenerate evaluation report (metrics table + plots)
 	python -m creditlens.evaluation.report
 
-serve:             ## Launch FastAPI app + frontend at http://localhost:8000
+serve:             ## Launch FastAPI app + frontend at http://localhost:8000 (dev, reload)
 	uvicorn creditlens.serve.api:app --reload --port 8000
+
+serve-prod:        ## Launch with multiple workers (stateless -> scales horizontally)
+	uvicorn creditlens.serve.api:app --host 0.0.0.0 --port 8000 --workers 4
 
 test:              ## Run test suite
 	pytest
