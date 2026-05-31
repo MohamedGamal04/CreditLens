@@ -1,4 +1,4 @@
-.PHONY: install data fixtures train eval serve serve-prod test lint format mlflow-ui clean
+.PHONY: install data fixtures train tune eval serve serve-prod test lint format mlflow-ui clean
 
 # All targets run inside the uv-managed .venv via `uv run` (single source of truth).
 
@@ -13,6 +13,9 @@ fixtures:          ## Build tiny synthetic samples for tests/CI
 
 train:             ## Train + calibrate + save all 6 models (logs to MLflow)
 	uv run python -m creditlens.pipeline
+
+tune:              ## GridSearch tuning (proves registry hyperparameters; --sample for speed)
+	uv run python scripts/tune.py
 
 serve:             ## Launch FastAPI app + frontend at http://localhost:8000 (dev, reload)
 	uv run uvicorn creditlens.serve.api:app --reload --port 8000
