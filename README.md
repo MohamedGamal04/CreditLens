@@ -41,6 +41,18 @@ Credit default-risk modeling on the Kaggle [Home Credit Default Risk](https://ww
 - **Lift:** the riskiest score decile catches **~3.3×** the base default rate.
 - **Honest note on AUC ≈ 0.74:** the served models use a **15-feature contract** the web form can actually supply (see below). That's ~0.02–0.03 below a full 146-feature model — a deliberate trade for an end-to-end, form-servable product. Gradient-boosted trees dominate; the multi-model comparison is partly pedagogical.
 
+## Fairness
+
+The served model is audited for disparate impact on the held-out test set across gender, age band, and region rating (notebook [`05_fairness.ipynb`](notebooks/05_fairness.ipynb)):
+
+| Group | Disparate impact (min/max approval) | 80% rule |
+|---|---|---|
+| Gender | 0.96 | pass |
+| Age band | 0.83 | pass (marginal) |
+| Region rating | 0.84 | pass (marginal) |
+
+No group **fails** the 80% rule, but **age and region carry real equal-opportunity gaps**: among true non-defaulters, under-30 applicants are approved ~14 pts less than 60+ (84% vs 98%). The model uses age/region as predictive proxies, so *qualified* applicants in higher-risk cohorts are disadvantaged — disclosed here rather than hidden; in production this warrants group-aware thresholds or dropping these proxies.
+
 ## The 15-feature contract
 
 The web form (and `/predict`) collect exactly the 15 features the models train on, so request → model is consistent end-to-end:
