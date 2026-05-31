@@ -3,10 +3,12 @@
    =================================================================== */
 const { useEffect: useEff } = React;
 
+// lowCut/highCut bracket the cost-derived bands (metadata.json: low=0.188 high=0.191,
+// cost_ratio 5) at integer-percent slider granularity.
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "gauge": "linear",
-  "lowCut": 6,
-  "highCut": 15,
+  "lowCut": 18,
+  "highCut": 20,
   "density": "regular"
 }/*EDITMODE-END*/;
 
@@ -155,7 +157,7 @@ function App() {
         <TweakSection label="Risk gauge" />
         <TweakRadio label="Style" value={t.gauge} options={['radial', 'linear']} onChange={v => setTweak('gauge', v)} />
         <TweakSection label="Band thresholds" />
-        <TweakSlider label="Low / Medium cut" value={t.lowCut} min={3} max={15} step={1} unit="%" onChange={v => setTweak('lowCut', Math.min(v, t.highCut - 2))} />
+        <TweakSlider label="Low / Medium cut" value={t.lowCut} min={3} max={25} step={1} unit="%" onChange={v => setTweak('lowCut', Math.min(v, t.highCut - 2))} />
         <TweakSlider label="Medium / High cut" value={t.highCut} min={16} max={45} step={1} unit="%" onChange={v => setTweak('highCut', Math.max(v, t.lowCut + 2))} />
         <TweakSection label="Layout" />
         <TweakRadio label="Density" value={t.density} options={['compact', 'regular']} onChange={v => setTweak('density', v)} />

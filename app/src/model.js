@@ -101,7 +101,7 @@
   }
 
   // ---- bands -----------------------------------------------------------------
-  let THRESH = { low: 0.06, high: 0.15 };
+  let THRESH = { low: 0.188, high: 0.191 };  // synced to models/metadata.json bands (cost_ratio 5)
   function setThresholds(low, high) { THRESH = { low, high }; }
   function getThresholds() { return THRESH; }
   function band(p) { return p < THRESH.low ? 'low' : (p < THRESH.high ? 'med' : 'high'); }
