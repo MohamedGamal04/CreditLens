@@ -99,6 +99,16 @@ def test_batch_predict_missing_columns_400(client):
     assert r.status_code == 400
 
 
+def test_explain_ok(client):
+    r = client.post("/explain", json={"applicant": VALID_APPLICANT, "model": "logreg", "top_n": 5})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["available"] is True
+    assert len(body["contributions"]) == 5
+    assert {"feature", "contribution", "value"} == set(body["contributions"][0])
+    assert 0.0 <= body["probability"] <= 1.0
+
+
 def test_predict_uses_metadata_bands(matrix):
     model = make_pipeline("logreg").fit(matrix[MODEL_FEATURES], matrix[TARGET])
     api.MODELS.clear()

@@ -38,8 +38,14 @@ from creditlens.data.features import (
     applicant_to_features,
     applicants_frame_to_features,
 )
+from creditlens.evaluation.explain import explain_one
 from creditlens.evaluation.metrics import summarize
-from creditlens.serve.schema import PredictRequest, PredictResponse
+from creditlens.serve.schema import (
+    ExplainRequest,
+    ExplainResponse,
+    PredictRequest,
+    PredictResponse,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("creditlens.api")
@@ -174,6 +180,21 @@ async def predict(req: PredictRequest) -> PredictResponse:
              key, proba, band, (time.perf_counter() - t0) * 1000)
     return PredictResponse(
         probability=proba, band=band, decision=_DECISION[band], model=key, features=feats,
+    )
+
+
+@app.post("/explain", response_model=ExplainResponse)
+async def explain(req: ExplainRequest) -> ExplainResponse:
+    t0 = time.perf_counter()
+    model, key = _require_model(req.model)
+    feats = applicant_to_features(req.applicant.model_dump())
+    proba = await run_in_threadpool(_predict_one, model, feats)
+    contribs = await run_in_threadpool(explain_one, model, key, feats, req.top_n)
+    log.info("explain model=%s available=%s (%.1fms)",
+             key, contribs is not None, (time.perf_counter() - t0) * 1000)
+    return ExplainResponse(
+        model=key, probability=proba,
+        available=contribs is not None, contributions=contribs or [],
     )
 
 

@@ -54,3 +54,22 @@ class PredictResponse(BaseModel):
     decision: Literal["approve", "review", "decline"]
     model: str
     features: dict
+
+
+class ExplainRequest(BaseModel):
+    applicant: Applicant
+    model: ModelKey = "lgbm"
+    top_n: int = Field(8, ge=1, le=15)
+
+
+class FeatureContribution(BaseModel):
+    feature: str
+    contribution: float
+    value: float
+
+
+class ExplainResponse(BaseModel):
+    model: str
+    probability: float = Field(description="calibrated PD (headline number)")
+    available: bool = Field(description="False for the stacking ensemble")
+    contributions: list[FeatureContribution]  # empty when unavailable
