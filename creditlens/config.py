@@ -27,5 +27,9 @@ ID_COL = "SK_ID_CURR"
 RANDOM_SEED = 42
 N_FOLDS = 5
 
+# Decision-threshold economics: cost of a false negative (approve a defaulter)
+# relative to a false positive (decline a good applicant). Drives the band cuts.
+COST_RATIO = 5.0
+
 # Kaggle competition slug for the download script
 KAGGLE_COMPETITION = "home-credit-default-risk"
