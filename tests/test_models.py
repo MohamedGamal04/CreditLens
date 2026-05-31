@@ -39,3 +39,9 @@ def test_train_all_writes_bands(tmp_path, monkeypatch, matrix):
     # in test_thresholds on realistic data; tiny synthetic fixtures can collapse the band.
     assert 0.0 <= bands["low"] <= bands["high"] <= 1.0
     assert bands["cost_ratio"] == 5.0
+
+    import json as _json
+
+    ref = _json.loads((tmp_path / "reference.json").read_text())
+    assert set(ref) == set(MODEL_FEATURES)
+    assert all({"edges", "ref_pct", "nan_pct"} <= set(ref[f]) for f in ref)

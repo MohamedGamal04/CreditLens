@@ -24,6 +24,7 @@ from sklearn.model_selection import train_test_split
 
 from creditlens.config import COST_RATIO, MODELS_DIR, RANDOM_SEED, TARGET
 from creditlens.data.features import MODEL_FEATURES, load_or_build_model_matrix
+from creditlens.evaluation.drift import build_reference
 from creditlens.evaluation.metrics import summarize
 from creditlens.evaluation.thresholds import decision_bands
 from creditlens.models.registry import BASE_MODELS, make_pipeline, make_stacking
@@ -136,6 +137,10 @@ def train_all(*, calibrate: bool = True, track: bool = True) -> dict:
     payload["bands"] = {"low": low, "high": high, "cost_ratio": COST_RATIO}
     log.info("decision bands (cost_ratio=%.1f): low=%.4f high=%.4f", COST_RATIO, low, high)
     (MODELS_DIR / "metadata.json").write_text(json.dumps(payload, indent=2))
+
+    reference = build_reference(X_tr, MODEL_FEATURES)
+    (MODELS_DIR / "reference.json").write_text(json.dumps(reference, indent=2))
+    log.info("drift reference saved (%d features) -> reference.json", len(reference))
     log.info("best by AUC: %s | saved %d models -> %s",
              payload["best"], len(ALL_MODELS), MODELS_DIR)
     return payload
