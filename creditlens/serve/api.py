@@ -38,6 +38,7 @@ from creditlens.data.features import (
     applicant_to_features,
     applicants_frame_to_features,
 )
+from creditlens.evaluation.drift import drift_report
 from creditlens.evaluation.explain import explain_one
 from creditlens.evaluation.metrics import summarize
 from creditlens.serve.schema import (
@@ -59,6 +60,7 @@ DEFAULT_HIGH = 0.15
 
 MODELS: dict = {}
 METADATA: dict = {}
+REFERENCE: dict = {}  # training feature distribution for drift (PSI)
 ALIAS = {"stack": "stacking"}  # frontend key -> saved artifact name
 
 
@@ -71,6 +73,9 @@ def _load() -> None:
         if bands:
             global DEFAULT_LOW, DEFAULT_HIGH
             DEFAULT_LOW, DEFAULT_HIGH = bands["low"], bands["high"]
+    ref_path = MODELS_DIR / "reference.json"
+    if ref_path.exists():
+        REFERENCE.update(json.loads(ref_path.read_text()))
     for path in MODELS_DIR.glob("*.joblib"):
         MODELS[path.stem] = joblib.load(path)
 
@@ -119,7 +124,8 @@ def _predict_one(model, feats: dict) -> float:
 
 def _score_batch(model, df: pd.DataFrame, low: float, high: float) -> dict:
     """CPU-bound: vectorized scoring of a whole frame. Runs in a threadpool."""
-    proba = model.predict_proba(applicants_frame_to_features(df))[:, 1]
+    feats_frame = applicants_frame_to_features(df)
+    proba = model.predict_proba(feats_frame)[:, 1]
     bands = np.where(proba < low, "low", np.where(proba < high, "med", "high"))
 
     has_target = "TARGET" in df.columns and df["TARGET"].nunique() > 1
@@ -150,6 +156,8 @@ def _score_batch(model, df: pd.DataFrame, low: float, high: float) -> dict:
     }
     if has_target:
         summary.update({k: round(v, 4) for k, v in summarize(df["TARGET"], proba).items()})
+    if REFERENCE:
+        summary["drift"] = drift_report(REFERENCE, feats_frame, MODEL_FEATURES)
     return {"summary": summary, "rows": rows}
 
 

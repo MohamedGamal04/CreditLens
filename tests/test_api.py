@@ -99,6 +99,22 @@ def test_batch_predict_missing_columns_400(client):
     assert r.status_code == 400
 
 
+def test_batch_predict_includes_drift(client, matrix, app_df):
+    api.REFERENCE.clear()
+    api.REFERENCE.update({f: {"edges": [0.0, 0.5, 1.0], "ref_pct": [0.5, 0.5], "nan_pct": 0.0}
+                          for f in MODEL_FEATURES})
+    try:
+        csv = _batch_csv(matrix, app_df)
+        r = client.post("/batch_predict?model=logreg",
+                        files={"file": ("a.csv", io.BytesIO(csv), "text/csv")})
+        assert r.status_code == 200
+        drift = r.json()["summary"]["drift"]
+        assert set(drift["per_feature"]) == set(MODEL_FEATURES)
+        assert "flagged" in drift and "max_psi" in drift
+    finally:
+        api.REFERENCE.clear()
+
+
 def test_explain_ok(client):
     r = client.post("/explain", json={"applicant": VALID_APPLICANT, "model": "logreg", "top_n": 5})
     assert r.status_code == 200
