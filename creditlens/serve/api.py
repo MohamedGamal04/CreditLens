@@ -100,7 +100,8 @@ def _score_batch(model, df: pd.DataFrame, low: float, high: float) -> dict:
     bands = np.where(proba < low, "low", np.where(proba < high, "med", "high"))
 
     has_target = "TARGET" in df.columns and df["TARGET"].nunique() > 1
-    ids = df["SK_ID_CURR"].astype(int).tolist() if "SK_ID_CURR" in df.columns else list(range(len(df)))
+    has_id = "SK_ID_CURR" in df.columns
+    ids = df["SK_ID_CURR"].astype(int).tolist() if has_id else list(range(len(df)))
     names = df["name"].astype(str).tolist() if "name" in df.columns else [f"APP-{i}" for i in ids]
     credit = df["amt_credit"].astype(float).tolist()
     ext2 = df["ext_source_2"].astype(float).tolist()

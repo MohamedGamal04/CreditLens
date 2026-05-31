@@ -54,7 +54,9 @@ def train_all(*, calibrate: bool = True) -> dict:
 
         if calibrate:
             # FrozenEstimator => isotonic fit on the calib set without refitting the model.
-            model = CalibratedClassifierCV(FrozenEstimator(est), method="isotonic").fit(X_cal, y_cal)
+            model = CalibratedClassifierCV(
+                FrozenEstimator(est), method="isotonic"
+            ).fit(X_cal, y_cal)
             cal = summarize(y_te, model.predict_proba(X_te)[:, 1])
         else:
             model, cal = est, raw

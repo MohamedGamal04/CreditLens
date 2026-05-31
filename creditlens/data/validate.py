@@ -40,7 +40,10 @@ def validate_application(df: pd.DataFrame, *, require_target: bool = True) -> li
     """Validate the application frame. Returns soft warnings; raises on hard errors."""
     warnings: list[str] = []
 
-    required = REQUIRED_COLUMNS if require_target else tuple(c for c in REQUIRED_COLUMNS if c != TARGET)
+    required = (
+        REQUIRED_COLUMNS if require_target
+        else tuple(c for c in REQUIRED_COLUMNS if c != TARGET)
+    )
     missing = [c for c in required if c not in df.columns]
     if missing:
         raise DataValidationError(f"Missing required columns: {missing}")

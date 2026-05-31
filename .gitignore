@@ -43,3 +43,7 @@ app/.thumbnail
 
 # Sample batch CSV (real-data-derived; regenerate via scripts/make_sample_batch.py)
 app/sample_applications.csv
+
+# CatBoost training artifacts
+catboost_info/
+**/catboost_info/

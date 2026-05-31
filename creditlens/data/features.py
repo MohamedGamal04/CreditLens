@@ -260,7 +260,9 @@ def build_model_matrix(
     return out[cols]
 
 
-def load_or_build_model_matrix(*, use_cache: bool = True, cache_name: str = "model_matrix.pkl") -> pd.DataFrame:
+def load_or_build_model_matrix(
+    *, use_cache: bool = True, cache_name: str = "model_matrix.pkl"
+) -> pd.DataFrame:
     """Return the 15-feature contract frame, caching it to ``data/processed/``.
 
     Aggregating the 1.7M-row side tables every run is wasteful; this caches the
