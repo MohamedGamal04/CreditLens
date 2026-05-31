@@ -22,9 +22,10 @@ from sklearn.calibration import CalibratedClassifierCV
 from sklearn.frozen import FrozenEstimator
 from sklearn.model_selection import train_test_split
 
-from creditlens.config import MODELS_DIR, RANDOM_SEED, TARGET
+from creditlens.config import COST_RATIO, MODELS_DIR, RANDOM_SEED, TARGET
 from creditlens.data.features import MODEL_FEATURES, load_or_build_model_matrix
 from creditlens.evaluation.metrics import summarize
+from creditlens.evaluation.thresholds import decision_bands
 from creditlens.models.registry import BASE_MODELS, make_pipeline, make_stacking
 
 # MLflow is a dev/training-time dependency. Guarded so the pipeline still runs
@@ -80,6 +81,7 @@ def train_all(*, calibrate: bool = True, track: bool = True) -> dict:
 
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     meta: dict = {}
+    te_proba: dict = {}
 
     for name in ALL_MODELS:
         t0 = time.time()
@@ -95,6 +97,7 @@ def train_all(*, calibrate: bool = True, track: bool = True) -> dict:
         else:
             model, cal = est, raw
 
+        te_proba[name] = model.predict_proba(X_te)[:, 1]
         joblib.dump(model, MODELS_DIR / f"{name}.joblib", compress=3)  # compress (RF is large)
         meta[name] = {
             "auc": round(cal["auc"], 4),
@@ -129,6 +132,9 @@ def train_all(*, calibrate: bool = True, track: bool = True) -> dict:
         "best": max(meta, key=lambda k: meta[k]["auc"]),
         "models": meta,
     }
+    low, high = decision_bands(y_te, te_proba[payload["best"]], COST_RATIO)
+    payload["bands"] = {"low": low, "high": high, "cost_ratio": COST_RATIO}
+    log.info("decision bands (cost_ratio=%.1f): low=%.4f high=%.4f", COST_RATIO, low, high)
     (MODELS_DIR / "metadata.json").write_text(json.dumps(payload, indent=2))
     log.info("best by AUC: %s | saved %d models -> %s",
              payload["best"], len(ALL_MODELS), MODELS_DIR)
