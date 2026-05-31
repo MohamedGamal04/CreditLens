@@ -20,9 +20,8 @@ function ExtSlider({ label, value, onChange }) {
   const band = value < 0.35 ? 'high' : value < 0.6 ? 'med' : 'low';
   return (
     <div className="field">
-      <label>{label}
-        <span className="mono" style={{ marginLeft: 'auto', fontSize: 14, fontWeight: 600, color: RISK[band].s }}>{value.toFixed(3)}</span>
-      </label>
+      <label style={{ display: 'block' }}>{label}</label>
+      <span className="mono" style={{ display: 'block', fontSize: 14, fontWeight: 600, color: RISK[band].s, margin: '2px 0 6px' }}>{value.toFixed(3)}</span>
       <input className="range" type="range" min={0} max={1} step={0.001} value={value} onChange={e => onChange(+e.target.value)} />
     </div>
   );
@@ -50,7 +49,7 @@ function ApplicantPage({ applicant, setApplicant, result, gaugeVariant, threshol
         {/* ---- form ---- */}
         <div className="card">
           <div className="card-head">
-            <div className="card-title">Applicant profile<div className="sub">SK_ID_CURR 100002</div></div>
+            <div className="card-title">Applicant profile</div>
             <div className="spacer" />
             <span className="id mono" style={{ fontSize: 12, color: 'var(--ink-4)' }}>application_train</span>
           </div>

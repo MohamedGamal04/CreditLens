@@ -86,27 +86,13 @@ function RiskGauge({ prob, band, thresholds, variant = 'radial', size = 260 }) {
 
 }
 
-function LinearGauge({ prob, band, thresholds }) {
-  const t = thresholds;
+function LinearGauge({ prob, band }) {
   const col = RISK[band];
   return (
     <div style={{ padding: '8px 4px 4px' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
         <span className="mono" style={{ fontSize: 44, fontWeight: 600, color: col.s, letterSpacing: '-0.03em', lineHeight: 1 }}>{pct(prob, 1)}</span>
-        <span style={{ fontSize: 12.5, color: 'var(--ink-3)', fontWeight: 600 }}>default<br />probability</span>
-      </div>
-      <div style={{ position: 'relative', height: 16, borderRadius: 10, overflow: 'hidden', display: 'flex' }}>
-        <div style={{ width: pct(t.low), background: 'var(--low)' }} />
-        <div style={{ width: pct(t.high - t.low), background: 'var(--med)' }} />
-        <div style={{ flex: 1, background: 'var(--high)' }} />
-      </div>
-      <div style={{ position: 'relative', height: 0 }}>
-        <div style={{ position: 'absolute', left: `calc(${pct(Math.min(prob, 1))} - 8px)`, top: -19,
-          width: 0, height: 0, borderLeft: '8px solid transparent', borderRight: '8px solid transparent',
-          borderTop: '11px solid var(--ink)', transition: 'left 0.7s cubic-bezier(.2,.8,.2,1)', filter: 'drop-shadow(0 -1px 1px rgba(0,0,0,.2))' }} />
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 9, fontSize: 11, color: 'var(--ink-4)', fontFamily: 'var(--mono)' }}>
-        <span>0%</span><span>{pct(t.low, 0)}</span><span>{pct(t.high, 0)}</span><span>100%</span>
+        <span style={{ fontSize: 12.5, color: 'var(--ink-3)', fontWeight: 600 }}>default probability</span>
       </div>
     </div>);
 
