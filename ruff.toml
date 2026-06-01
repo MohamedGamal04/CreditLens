@@ -7,3 +7,6 @@ extend-exclude = ["notebooks", "*.ipynb"]
 [lint]
 select = ["E", "F", "I", "UP", "B"]
 ignore = ["B008"]
+
+[lint.isort]
+known-first-party = ["creditlens"]  # so scripts/ group the package import like the backend does
