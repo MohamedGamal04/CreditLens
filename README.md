@@ -6,6 +6,9 @@ Credit default-risk modeling on the Kaggle [Home Credit Default Risk](https://ww
 
 ![CI](https://github.com/MohamedGamal04/CreditLens/actions/workflows/ci.yml/badge.svg)
 
+**🔗 Live demo:** [credit-lens-lyart.vercel.app](https://credit-lens-lyart.vercel.app) — frontend on Vercel, backend API on [Hugging Face Spaces](https://huggingface.co/spaces/MohamedGamal04/CreditLens) ([`/docs`](https://MohamedGamal04-creditlens.hf.space/docs)).
+> The backend sleeps on HF's free tier; the first request shows a "waking up" banner and resolves in ~30s.
+
 ## What it does
 
 - **6 models compared** — LogisticRegression (baseline) · RandomForest · XGBoost · LightGBM · CatBoost · Stacking ensemble.
@@ -123,6 +126,13 @@ notebooks/       EDA → features → modeling → evaluation → fairness → m
 scripts/         download_data · make_fixtures · make_sample_batch · tune
 models/ · data/  trained artifacts + Kaggle CSVs (gitignored)
 ```
+
+## Deployment
+
+Split deploy (monorepo → two targets):
+
+- **Backend** (`backend/`) → **Hugging Face Spaces** (Docker). Backend-only image; trained models shipped via Git LFS. Lock cross-origin access with the `ALLOWED_ORIGINS` env var (defaults to `*`).
+- **Frontend** (`frontend/`) → **Vercel** (static; no build). `src/config.js` auto-targets the HF backend off-localhost, same-origin locally.
 
 ## Limitations / honest notes
 
