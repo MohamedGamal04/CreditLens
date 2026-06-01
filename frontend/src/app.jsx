@@ -67,6 +67,18 @@ function App() {
     ? { ...localResult, prob: apiScore.probability, band: apiScore.band }
     : localResult;
 
+  // Backend liveness — HF Spaces free tier sleeps; surface a "warming up" banner on
+  // cold start and poll /health until it answers (live scores then resume).
+  const [backendUp, setBackendUp] = useState(null);  // null = checking, true, false
+  useEff(() => {
+    let alive = true, timer;
+    const ping = () => fetch((window.API_BASE || '') + '/health')
+      .then(r => { if (r.ok) setBackendUp(true); else throw new Error('down'); })
+      .catch(() => { if (alive) { setBackendUp(false); timer = setTimeout(ping, 4000); } });
+    ping();
+    return () => { alive = false; clearTimeout(timer); };
+  }, []);
+
   const go = r => { setRoute(r); location.hash = r; document.querySelector('.main').scrollTop = 0; };
   useEff(() => {
     const h = () => setRoute(location.hash.replace('#', '') || 'applicant');
@@ -100,6 +112,15 @@ function App() {
 
   return (
     <div className={`app density-${t.density}`}>
+      {backendUp === false && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000,
+          background: '#b45309', color: '#fff', padding: '7px 14px', fontSize: 13,
+          fontWeight: 600, textAlign: 'center', letterSpacing: '0.01em' }}>
+          <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+            background: '#fde68a', marginRight: 8, animation: 'pulse 1.2s ease-in-out infinite' }} />
+          Backend waking up — Hugging Face Spaces cold start (~30s). Showing a local estimate; live scores resume automatically.
+        </div>
+      )}
       {/* sidebar */}
       <aside className="sidebar">
         <div className="brand">
@@ -139,9 +160,9 @@ function App() {
             {route === 'modelcard' && (
               <button className="btn btn-ghost"><I name="download" size={15} />Export PDF</button>
             )}
-            <span className="api-pill" title={apiScore ? 'calibrated PD from backend' : 'backend offline — local fallback'}>
+            <span className="api-pill" title={apiScore ? 'calibrated PD from backend' : (backendUp === false ? 'backend waking up — local fallback' : 'backend offline — local fallback')}>
               <span className="live" style={{ background: apiScore ? undefined : 'var(--ink-4)' }} />
-              POST /predict · {apiScore ? '200' : 'offline'}</span>
+              POST /predict · {apiScore ? '200' : (backendUp === false ? 'waking…' : 'offline')}</span>
             <ModelSelector value={model} onChange={setModel} aucMap={aucMap} />
           </div>
         </header>
