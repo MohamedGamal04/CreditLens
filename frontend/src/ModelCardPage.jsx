@@ -18,7 +18,7 @@ function Leaderboard({ board, model, setModel }) {
     <table className="tbl">
       <thead><tr>
         <th>Model</th><th>Family</th><th className="right">AUC-ROC</th><th>Discrimination</th>
-        <th className="right">KS</th><th className="right">Gini</th><th className="right">Latency</th><th></th>
+        <th className="right">KS</th><th className="right">Gini</th><th className="right">ECE</th><th></th>
       </tr></thead>
       <tbody>
         {board.map((b, i) => (
@@ -28,7 +28,6 @@ function Leaderboard({ board, model, setModel }) {
                 <ModelGlyph color={b.color} size={24} />
                 <div>
                   <div style={{ fontWeight: 600, color: 'var(--ink)' }}>{b.name}{i === 0 && <span style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 650, color: 'var(--low-strong)', background: 'var(--low-soft)', padding: '1px 7px', borderRadius: 5 }}>BEST</span>}</div>
-                  <div className="id" style={{ fontFamily: 'var(--mono)' }}>{b.params}</div>
                 </div>
               </div>
             </td>
@@ -41,7 +40,7 @@ function Leaderboard({ board, model, setModel }) {
             </td>
             <td className="right mono">{pct(b.ks, 1)}</td>
             <td className="right mono">{b.gini.toFixed(3)}</td>
-            <td className="right mono muted">{b.latency} ms</td>
+            <td className="right mono muted">{b.ece != null ? b.ece.toFixed(3) : '—'}</td>
             <td className="right">
               {b.key === model
                 ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--blue-700)', fontWeight: 650, fontSize: 12 }}><I name="check" size={14} />Active</span>
@@ -54,7 +53,7 @@ function Leaderboard({ board, model, setModel }) {
   );
 }
 
-function ModelCardPage({ thresholds, model, setModel, valSet, board }) {
+function ModelCardPage({ thresholds, model, setModel, valSet, board, realMetrics }) {
   const m = CL.getModel(model);
   const entry = board.find(b => b.key === model) || board[0];
   const scored = useMemo(() => CL.scoreRows(valSet, model), [valSet, model, thresholds.low, thresholds.high]);
@@ -82,7 +81,7 @@ function ModelCardPage({ thresholds, model, setModel, valSet, board }) {
           <ModelGlyph color={m.color} size={50} />
           <div style={{ flex: 1, minWidth: 220 }}>
             <div style={{ fontSize: 18, fontWeight: 650, letterSpacing: '-0.01em' }}>{m.name}</div>
-            <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>{m.family} · {m.params} · PD on Home Credit Default Risk</div>
+            <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>{m.family} · PD on Home Credit Default Risk</div>
           </div>
           {[['Dataset','application + bureau + prev'],['Train rows','307,511'],['Features','15 (contract)']].map(([k, v]) => (
             <div key={k} style={{ paddingLeft: 18, borderLeft: '1px solid var(--border)' }}>
@@ -96,22 +95,36 @@ function ModelCardPage({ thresholds, model, setModel, valSet, board }) {
       {/* leaderboard */}
       <div className="card" style={{ marginBottom: 18 }}>
         <div className="card-head">
-          <div className="card-title">Model leaderboard<div className="sub">5-fold OOF validation · {valSet.length.toLocaleString()} held-out applicants · click a row to activate</div></div>
+          <div className="card-title">Model leaderboard<div className="sub">{realMetrics ? 'held-out test metrics from the backend (/models)' : 'illustrative — synthetic validation set'} · click a row to activate</div></div>
         </div>
         <Leaderboard board={board} model={model} setModel={setModel} />
       </div>
 
-      {/* metrics for active model */}
+      {/* metrics for active model — real (from /models) when the backend is reachable */}
       <div className="grid" style={{ gridTemplateColumns: 'repeat(6, 1fr)', marginBottom: 18 }}>
-        <Metric label="AUC-ROC" value={entry.auc.toFixed(3)} hint="discrimination" />
+        <Metric label="AUC-ROC" value={entry.auc.toFixed(realMetrics ? 4 : 3)} hint="discrimination" />
         <Metric label="KS" value={pct(entry.ks, 1)} hint="separation" />
         <Metric label="Gini" value={entry.gini.toFixed(3)} hint="2·AUC−1" />
-        <Metric label="Avg precision" value={rp.ap.toFixed(3)} hint="PR area" />
-        <Metric label="Brier" value={brier.toFixed(3)} hint="calibration" />
-        <Metric label="Base rate" value={pct(rp.baseRate, 1)} hint="observed PD" />
+        {realMetrics ? (
+          <>
+            <Metric label="ECE" value={entry.ece != null ? entry.ece.toFixed(3) : '—'} hint="calibration error" />
+            <Metric label="ECE (raw)" value={entry.ece_uncalibrated != null ? entry.ece_uncalibrated.toFixed(3) : '—'} hint="pre-calibration" />
+            <Metric label="Calibrated" value={entry.calibrated ? 'isotonic' : 'no'} hint="PD reliability" />
+          </>
+        ) : (
+          <>
+            <Metric label="Avg precision" value={rp.ap.toFixed(3)} hint="PR area" />
+            <Metric label="Brier" value={brier.toFixed(3)} hint="calibration" />
+            <Metric label="Base rate" value={pct(rp.baseRate, 1)} hint="observed PD" />
+          </>
+        )}
       </div>
 
-      {/* curves */}
+      {/* curves — illustrative: per-row scores aren't exposed by the backend */}
+      <div style={{ fontSize: 12, color: 'var(--ink-4)', marginBottom: 10 }}>
+        <b>Illustrative</b> — the curves below are computed on a synthetic validation set; the
+        backend serves headline metrics (above), not per-applicant scores.
+      </div>
       <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', marginBottom: 18 }}>
         <div className="card">
           <div className="card-head"><div className="card-title">ROC curve<div className="sub">AUC {rp.auc.toFixed(3)}</div></div></div>
@@ -148,7 +161,7 @@ function ModelCardPage({ thresholds, model, setModel, valSet, board }) {
       <div className="card">
         <div className="card-head">
           <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--blue-soft)', color: 'var(--blue-700)', display: 'grid', placeItems: 'center' }}><I name="shield" size={18} /></div>
-          <div className="card-title">Fairness check<div className="sub">Approval & default rates across groups · demographic parity · {m.name}</div></div>
+          <div className="card-title">Fairness check<div className="sub">Illustrative (synthetic) · the real audit is in notebook 05_fairness · {m.name}</div></div>
         </div>
         <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', padding: 24, gap: 28 }}>
           {[['By region', fairRegion], ['By age group', fairAge]].map(([title, data]) => {

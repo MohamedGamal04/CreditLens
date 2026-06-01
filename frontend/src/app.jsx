@@ -37,9 +37,44 @@ function App() {
   const thresholds = { low: t.lowCut / 100, high: t.highCut / 100 };
   useEff(() => { CL.setThresholds(thresholds.low, thresholds.high); }, [t.lowCut, t.highCut]);
 
-  // validation set + per-model leaderboard (drives selector AUC + model card)
+  // Backend liveness — HF Spaces free tier sleeps; surface a "warming up" banner on
+  // cold start and poll /health until it answers (live scores then resume).
+  const [backendUp, setBackendUp] = useState(null);  // null = checking, true, false
+  useEff(() => {
+    let alive = true, timer;
+    const ping = () => fetch((window.API_BASE || '') + '/health')
+      .then(r => { if (r.ok) setBackendUp(true); else throw new Error('down'); })
+      .catch(() => { if (alive) { setBackendUp(false); timer = setTimeout(ping, 4000); } });
+    ping();
+    return () => { alive = false; clearTimeout(timer); };
+  }, []);
+
+  // Synthetic validation set — only powers the Model-card curves (ROC/PR/confusion/fairness),
+  // which need per-row scores the backend doesn't expose. Labelled "illustrative" in the UI.
   const valSet = useMemo(() => CL.makePortfolio(2400, 7), []);
-  const board = useMemo(() => CL.leaderboard(valSet), [valSet, t.lowCut, t.highCut]);
+  const synthBoard = useMemo(() => CL.leaderboard(valSet), [valSet, t.lowCut, t.highCut]);
+
+  // Real per-model metrics from the backend (/models -> metadata.json); fall back to the
+  // local synthetic leaderboard when the API is unavailable (e.g. file:// or cold backend).
+  const [apiModels, setApiModels] = useState(null);
+  useEff(() => {
+    fetch((window.API_BASE || '') + '/models')
+      .then(r => (r.ok ? r.json() : null)).then(d => d && d.models && setApiModels(d))
+      .catch(() => {});
+  }, [backendUp]);
+
+  const realMetrics = !!apiModels;
+  const board = useMemo(() => {
+    if (!apiModels) return synthBoard;
+    return CL.MODELS
+      .map(m => {
+        const r = apiModels.models[m.key === 'stack' ? 'stacking' : m.key];
+        return r ? { ...m, auc: r.auc, ks: r.ks, gini: r.gini, ece: r.ece,
+                     ece_uncalibrated: r.ece_uncalibrated, calibrated: r.calibrated } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.auc - a.auc);
+  }, [apiModels, synthBoard]);
   const aucMap = useMemo(() => Object.fromEntries(board.map(m => [m.key, m.auc])), [board]);
 
   // Local toy scorer — instant attributions for the "Top drivers" panel, and the
@@ -67,17 +102,6 @@ function App() {
     ? { ...localResult, prob: apiScore.probability, band: apiScore.band }
     : localResult;
 
-  // Backend liveness — HF Spaces free tier sleeps; surface a "warming up" banner on
-  // cold start and poll /health until it answers (live scores then resume).
-  const [backendUp, setBackendUp] = useState(null);  // null = checking, true, false
-  useEff(() => {
-    let alive = true, timer;
-    const ping = () => fetch((window.API_BASE || '') + '/health')
-      .then(r => { if (r.ok) setBackendUp(true); else throw new Error('down'); })
-      .catch(() => { if (alive) { setBackendUp(false); timer = setTimeout(ping, 4000); } });
-    ping();
-    return () => { alive = false; clearTimeout(timer); };
-  }, []);
 
   const go = r => { setRoute(r); location.hash = r; document.querySelector('.main').scrollTop = 0; };
   useEff(() => {
@@ -167,7 +191,7 @@ function App() {
         {route === 'applicant' && <ApplicantPage applicant={applicant} setApplicant={setApplicant} result={result} gaugeVariant={t.gauge} thresholds={thresholds} model={model} go={go} />}
         {route === 'explain'   && <ExplanationPage applicant={applicant} result={result} thresholds={thresholds} model={model} go={go} />}
         {route === 'portfolio' && <PortfolioPage portfolio={portfolio} loadPortfolio={loadPortfolio} onUpload={uploadBatch} thresholds={thresholds} model={model} inspect={inspect} />}
-        {route === 'modelcard' && <ModelCardPage thresholds={thresholds} model={model} setModel={setModel} valSet={valSet} board={board} />}
+        {route === 'modelcard' && <ModelCardPage thresholds={thresholds} model={model} setModel={setModel} valSet={valSet} board={board} realMetrics={realMetrics} />}
       </main>
 
       {/* tweaks */}
