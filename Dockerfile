@@ -22,8 +22,9 @@ COPY pyproject.toml uv.lock README.md ./
 COPY creditlens ./creditlens
 RUN uv sync --frozen --no-dev --no-editable
 
-# App assets + trained model artifacts.
-COPY app ./app
+# Trained model artifacts only — this is a BACKEND-ONLY image (API). The frontend
+# deploys separately to Vercel. With no app/ dir, api.py skips its static mount
+# (guarded by APP_DIR.exists()), so the container serves pure API.
 COPY models ./models
 
 ENV PORT=8000

@@ -1,4 +1,4 @@
-# Keep the image small — ship only code, app, and models.
+# Keep the image small — ship only code and models (backend-only; frontend on Vercel).
 .git
 .github
 .venv
