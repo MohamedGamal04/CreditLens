@@ -31,7 +31,7 @@ function SectionHead({ table, title, note }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
       <TableChip table={table} />
-      <span className="eyebrow">{title}</span>
+      {title && <span className="eyebrow">{title}</span>}
       {note && <span style={{ fontSize: 11.5, color: 'var(--ink-4)', marginLeft: 'auto' }}>{note}</span>}
     </div>
   );
@@ -50,14 +50,12 @@ function ApplicantPage({ applicant, setApplicant, result, gaugeVariant, threshol
         <div className="card">
           <div className="card-head">
             <div className="card-title">Applicant profile</div>
-            <div className="spacer" />
-            <span className="id mono" style={{ fontSize: 12, color: 'var(--ink-4)' }}>application_train</span>
           </div>
 
           <div className="card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             {/* application */}
             <div>
-              <SectionHead table="application" title="Application" note="primary record" />
+              <SectionHead table="application" note="primary record" />
               <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 18 }}>
                 <NumField label="Income (AMT_INCOME_TOTAL)" prefix="$" value={applicant.amt_income} step={5000} onChange={v => set('amt_income', v)} />
                 <NumField label="Credit (AMT_CREDIT)" prefix="$" value={applicant.amt_credit} step={5000} onChange={v => set('amt_credit', v)} />
