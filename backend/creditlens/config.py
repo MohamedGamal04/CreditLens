@@ -6,15 +6,21 @@ hyperparameters. Import from here rather than hard-coding paths.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 # --- Paths -------------------------------------------------------------------
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = PROJECT_ROOT / "data"
+# backend/creditlens/config.py -> parents[1] = backend/, its parent = repo root.
+# data/, models/, frontend/ live at the repo root locally; in the backend-only
+# Docker image they are relocated, so each can be overridden with an env var.
+PACKAGE_ROOT = Path(__file__).resolve().parents[1]   # backend/
+REPO_ROOT = PACKAGE_ROOT.parent                       # repo root
+
+DATA_DIR = Path(os.environ.get("CL_DATA_DIR") or REPO_ROOT / "data")
 RAW_DIR = DATA_DIR / "raw"
 PROCESSED_DIR = DATA_DIR / "processed"
-MODELS_DIR = PROJECT_ROOT / "models"
-APP_DIR = PROJECT_ROOT / "app"
+MODELS_DIR = Path(os.environ.get("CL_MODELS_DIR") or REPO_ROOT / "models")
+APP_DIR = Path(os.environ.get("CL_APP_DIR") or REPO_ROOT / "frontend")
 
 # Raw Kaggle files we use (data scope: application + bureau + previous_application)
 APPLICATION_TRAIN = RAW_DIR / "application_train.csv"

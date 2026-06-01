@@ -17,13 +17,11 @@ jobs:
           cache: pip
 
       - name: Install
-        run: pip install -e ".[dev]"
+        run: pip install -e "./backend[dev]"
 
       - name: Lint
-        run: ruff check .
-
-      - name: Build test fixtures
-        run: python scripts/make_fixtures.py
+        run: ruff check backend scripts
 
       - name: Test
+        working-directory: backend
         run: pytest

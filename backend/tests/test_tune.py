@@ -1,8 +1,9 @@
 """Tuning script: GridSearch returns best params for a model."""
 
+from scripts.tune import tune
+
 from creditlens.config import TARGET
 from creditlens.data.features import MODEL_FEATURES
-from scripts.tune import tune
 
 
 def test_tune_logreg_returns_best(matrix):

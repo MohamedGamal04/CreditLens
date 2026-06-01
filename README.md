@@ -80,7 +80,7 @@ Kaggle CSVs ──> creditlens.data (load, validate, features)
         creditlens.pipeline  (train on full data → isotonic calibrate → save)
                      │  models/*.joblib + metadata.json
                      ▼
-        creditlens.serve.api (FastAPI)  ──>  app/CreditLens.html (React)
+        backend/creditlens.serve.api (FastAPI)  ──>  frontend/CreditLens.html (React)
            /predict · /explain · /batch_predict · /models · /health
 ```
 
@@ -126,11 +126,14 @@ Then open **http://localhost:8000**: adjust an applicant and watch the calibrate
 ## Project layout
 
 ```
-creditlens/      data · models · evaluation · serve · pipeline.py · config.py
-app/             CreditLens.html + React src (ApplicantPage, model.js, PortfolioPage, …)
-notebooks/       EDA → features → modeling → evaluation + experiments
-scripts/         download_data · make_fixtures · make_sample_batch
-tests/           pytest suite (synthetic fixtures; runs in CI without Kaggle data)
+backend/         FastAPI + ML (deploys to HF Spaces)
+  creditlens/    data · models · evaluation · serve · pipeline.py · config.py
+  tests/         pytest suite (synthetic fixtures; runs in CI without Kaggle data)
+  Dockerfile · pyproject.toml · uv.lock · conftest.py
+frontend/        React app (deploys to Vercel): CreditLens.html + src/ + vercel.json
+notebooks/       EDA → features → modeling → evaluation → fairness → monitoring + experiments
+scripts/         download_data · make_fixtures · make_sample_batch · tune
+models/ · data/  trained artifacts + Kaggle CSVs (gitignored)
 ```
 
 ## Limitations / honest notes

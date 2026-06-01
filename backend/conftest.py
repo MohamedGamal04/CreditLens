@@ -1,8 +1,14 @@
-"""Shared test fixtures (root conftest also puts the project root on sys.path)."""
+"""Shared test fixtures. Adds the repo root to sys.path so ``scripts`` (one level up
+from backend/) is importable for the synthetic-fixture builders."""
+
+import sys
+from pathlib import Path
 
 import pytest
 
-from scripts.make_fixtures import (
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # repo root
+
+from scripts.make_fixtures import (  # noqa: E402
     make_application_sample,
     make_bureau_sample,
     make_previous_sample,

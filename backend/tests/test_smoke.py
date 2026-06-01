@@ -1,7 +1,8 @@
 """Phase 0 smoke tests: package imports and the synthetic fixture builds."""
 
-import creditlens
 from scripts.make_fixtures import make_application_sample
+
+import creditlens
 
 
 def test_package_imports():

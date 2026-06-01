@@ -6,7 +6,6 @@ build-backend = "setuptools.build_meta"
 name = "creditlens"
 version = "0.1.0"
 description = "Credit default risk modeling on the Home Credit Default Risk dataset"
-readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "pandas>=2.0",

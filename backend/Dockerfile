@@ -15,10 +15,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-ENV UV_LINK_MODE=copy UV_COMPILE_BYTECODE=1
+# CL_MODELS_DIR: in this flat image creditlens sits at /app/creditlens, so the repo-root
+# default would resolve to /models — point it at the baked-in /app/models instead.
+ENV UV_LINK_MODE=copy UV_COMPILE_BYTECODE=1 CL_MODELS_DIR=/app/models
 
 # Install runtime deps only (exact lock, no dev: no mlflow/pytest in the image).
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml uv.lock ./
 COPY creditlens ./creditlens
 RUN uv sync --frozen --no-dev --no-editable
 

@@ -31,9 +31,11 @@ notebooks/*-scratch.ipynb
 .kaggle/
 *.env
 
-# OS / IDE
+# OS / IDE / local tooling
 .DS_Store
 Thumbs.db
+.vscode/
+.claude/
 
 # Generated profiling/EDA reports
 reports/
@@ -42,18 +44,21 @@ reports/
 docs/
 
 # Design bundle internals we don't need to track (keep CreditLens.html + src)
-app/.thumbnail
+frontend/.thumbnail
 
 # Sample batch CSV (real-data-derived; regenerate via scripts/make_sample_batch.py)
-app/sample_applications.csv
+frontend/sample_applications.csv
 
 # CatBoost training artifacts
 catboost_info/
 **/catboost_info/
 
-# MLflow tracking
+# MLflow tracking (training runs inside backend/)
 mlruns/
+**/mlruns/
 mlartifacts/
+**/mlartifacts/
 # Local mlflow UI / experiment outputs
 .vexp/
 mlflow.db
+**/mlflow.db
