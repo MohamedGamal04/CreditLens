@@ -81,10 +81,10 @@ function ModelCardPage({ thresholds, model, setModel, valSet, board }) {
         <div className="card-pad" style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
           <ModelGlyph color={m.color} size={50} />
           <div style={{ flex: 1, minWidth: 220 }}>
-            <div style={{ fontSize: 18, fontWeight: 650, letterSpacing: '-0.01em' }}>{m.name} <span className="mono" style={{ fontSize: 12, color: 'var(--ink-4)', fontWeight: 500 }}>v3.2.1</span></div>
+            <div style={{ fontSize: 18, fontWeight: 650, letterSpacing: '-0.01em' }}>{m.name}</div>
             <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>{m.family} · {m.params} · PD on Home Credit Default Risk</div>
           </div>
-          {[['Dataset','application + bureau + prev'],['Train rows','307,511'],['Features','218'],['Refresh','Quarterly']].map(([k, v]) => (
+          {[['Dataset','application + bureau + prev'],['Train rows','307,511'],['Features','15 (contract)']].map(([k, v]) => (
             <div key={k} style={{ paddingLeft: 18, borderLeft: '1px solid var(--border)' }}>
               <div style={{ fontSize: 11, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>{k}</div>
               <div style={{ fontSize: 13.5, fontWeight: 600, marginTop: 3 }}>{v}</div>

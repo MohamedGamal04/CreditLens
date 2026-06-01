@@ -157,9 +157,6 @@ function App() {
             {route === 'portfolio' && portfolio && (
               <button className="btn btn-ghost" onClick={() => setPortfolio(null)}><I name="upload" size={15} />New batch</button>
             )}
-            {route === 'modelcard' && (
-              <button className="btn btn-ghost"><I name="download" size={15} />Export PDF</button>
-            )}
             <span className="api-pill" title={apiScore ? 'calibrated PD from backend' : (backendUp === false ? 'backend waking up — local fallback' : 'backend offline — local fallback')}>
               <span className="live" style={{ background: apiScore ? undefined : 'var(--ink-4)' }} />
               POST /predict · {apiScore ? '200' : (backendUp === false ? 'waking…' : 'offline')}</span>
