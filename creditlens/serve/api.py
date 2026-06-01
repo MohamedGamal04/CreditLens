@@ -20,6 +20,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 
@@ -28,6 +29,7 @@ import numpy as np
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -93,6 +95,17 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="CreditLens", version="0.1.0", lifespan=lifespan)
+
+# CORS — the frontend may be served from a different origin (e.g. Vercel) than this
+# backend (e.g. HF Spaces). Set ALLOWED_ORIGINS (comma-separated) to the frontend URL
+# in production; defaults to "*" for an open public demo.
+_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",")]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # --- helpers -----------------------------------------------------------------

@@ -29,5 +29,9 @@ COPY models ./models
 ENV PORT=8000
 EXPOSE 8000
 
+# Liveness probe (slim image has no curl, so use python). 40s start period covers model load.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+    CMD python -c "import os,urllib.request,sys; sys.exit(0 if urllib.request.urlopen(f\"http://localhost:{os.getenv('PORT','8000')}/health\").status==200 else 1)"
+
 # Honor an injected $PORT (HF Spaces / Render / Cloud Run) with a sane default.
 CMD ["sh", "-c", ".venv/bin/uvicorn creditlens.serve.api:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"]

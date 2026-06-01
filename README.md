@@ -16,15 +16,18 @@ Credit default-risk modeling on the Kaggle [Home Credit Default Risk](https://ww
 
 > Predicts an applicant's **probability of default (PD)**, calibrated and explainable, with a model the user can choose at scoring time.
 
-<!-- Update <owner> once pushed to GitHub -->
-![CI](https://github.com/<owner>/CreditLens/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/MohamedGamal04/CreditLens/actions/workflows/ci.yml/badge.svg)
 
 ## What it does
 
 - **6 models compared** — LogisticRegression (baseline) · RandomForest · XGBoost · LightGBM · CatBoost · Stacking ensemble.
 - **Credit-realistic evaluation** — ROC AUC **plus** KS, probability **calibration** (isotonic), and lift by decile. A 0.74-AUC model with bad PDs is useless for lending; we calibrate.
-- **FastAPI backend** — `/predict` (single applicant) and `/batch_predict` (CSV upload), async, scales horizontally.
+- **FastAPI backend** — `/predict` (single applicant), `/batch_predict` (CSV upload), `/explain` (attributions), async, scales horizontally.
 - **Web app** — score one applicant live, switch models, or upload a portfolio CSV.
+- **Explainable** — `/explain` returns real SHAP (trees) / coefficient (logreg) per-feature attributions, shown in the app as adverse-action reasons (the stacking ensemble reports "unavailable").
+- **Cost-based decisions** — approve/review/decline bands derived from a 5:1 false-negative:false-positive cost ratio, written into `metadata.json` — not hand-picked.
+- **Drift monitoring** — per-feature PSI on every `/batch_predict` upload vs the training reference distribution.
+- **Fairness audited** — disparate-impact (80% rule) + equal-opportunity checks across gender, age, and region.
 
 ## Results (held-out test, calibrated)
 
@@ -78,7 +81,7 @@ Kaggle CSVs ──> creditlens.data (load, validate, features)
                      │  models/*.joblib + metadata.json
                      ▼
         creditlens.serve.api (FastAPI)  ──>  app/CreditLens.html (React)
-           /predict · /batch_predict · /models · /health
+           /predict · /explain · /batch_predict · /models · /health
 ```
 
 ## Quickstart
@@ -101,7 +104,8 @@ Then open **http://localhost:8000**: adjust an applicant and watch the calibrate
 | Endpoint | Method | Purpose |
 |---|---|---|
 | `/predict` | POST | Score one applicant → calibrated PD + band + decision |
-| `/batch_predict` | POST | Upload a CSV → per-row scores + portfolio summary (AUC/KS if `TARGET` present) |
+| `/explain` | POST | Per-feature attributions (SHAP for trees, coefficients for logreg; N/A for stacking) |
+| `/batch_predict` | POST | Upload a CSV → per-row scores + portfolio summary (AUC/KS if `TARGET` present) + per-feature drift PSI |
 | `/models` | GET | Per-model metrics (drives the UI selector) |
 | `/health` | GET | Liveness + loaded models |
 
@@ -114,7 +118,9 @@ Then open **http://localhost:8000**: adjust an applicant and watch the calibrate
 | `01_eda.ipynb` | Target imbalance, missingness, EXT_SOURCE signal, ratios, side-table cardinality, ydata-profiling |
 | `02_features.ipynb` | Feature engineering + leakage/sanity checks |
 | `03_modeling.ipynb` | GridSearch tuning, CV leaderboard, permutation feature importance (plotly) |
-| `04_evaluation.ipynb` | Calibration, reliability/ROC/lift curves |
+| `04_evaluation.ipynb` | Calibration, reliability/ROC/lift curves, cost-based thresholds |
+| `05_fairness.ipynb` | Disparate-impact + equal-opportunity audit by gender/age/region |
+| `06_monitoring.ipynb` | Drift monitoring (PSI) demo on a shifted batch |
 | `exp_pca.ipynb` | PCA experiment (negative result — kept out of production) |
 
 ## Project layout
@@ -130,7 +136,7 @@ tests/           pytest suite (synthetic fixtures; runs in CI without Kaggle dat
 ## Limitations / honest notes
 
 - **AUC ceiling ≈ 0.74** from the 15-feature form contract (full features would score higher but aren't form-servable).
-- **Portfolio & Model-card pages** use synthetic data for the demo; only the Applicant page and CSV upload hit the real backend.
+- **Portfolio & Model-card pages** use synthetic data for the demo; the Applicant + Explanation pages and the Portfolio CSV upload hit the real backend.
 - **Plotly charts** render in VSCode/Jupyter but not static GitHub previews.
 - Kaggle competition data is **not redistributed** (gitignored); reviewers run `make data` with their own token.
 

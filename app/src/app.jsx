@@ -51,7 +51,7 @@ function App() {
   useEff(() => {
     const ctrl = new AbortController();
     const id = setTimeout(() => {
-      fetch('/predict', {
+      fetch((window.API_BASE || '') + '/predict', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
         body: JSON.stringify({ applicant: sanitize(applicant), model, low: thresholds.low, high: thresholds.high }),
       })
@@ -83,7 +83,7 @@ function App() {
     const ctrl = new AbortController();
     const fd = new FormData(); fd.append('file', batchFile);
     console.info('[CreditLens] /batch_predict uploading', batchFile.name, 'model=' + model);
-    fetch(`/batch_predict?model=${model}&low=${thresholds.low}&high=${thresholds.high}`,
+    fetch(`${window.API_BASE || ''}/batch_predict?model=${model}&low=${thresholds.low}&high=${thresholds.high}`,
       { method: 'POST', body: fd, signal: ctrl.signal })
       .then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
       .then(d => {
