@@ -38,6 +38,9 @@ Thumbs.db
 # Generated profiling/EDA reports
 reports/
 
+# Local design docs / plans (superpowers specs + plans)
+docs/
+
 # Design bundle internals we don't need to track (keep CreditLens.html + src)
 app/.thumbnail
 
@@ -51,3 +54,6 @@ catboost_info/
 # MLflow tracking
 mlruns/
 mlartifacts/
+# Local mlflow UI / experiment outputs
+.vexp/
+mlflow.db

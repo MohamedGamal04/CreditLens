@@ -99,74 +99,6 @@ function LinearGauge({ prob, band }) {
 }
 
 /* ===================================================================
-   SHAP WATERFALL
-   =================================================================== */
-function Waterfall({ result, width = 720, maxRows = 9 }) {
-  const [tipNode, setTip] = useTip();
-  const rowH = 40,padL = 200,padR = 96,padT = 14,padB = 38;
-  const steps = result.steps.slice(0, maxRows);
-  const H = padT + steps.length * rowH + padB + 56;
-  const probs = [result.baseProb, ...steps.map((s) => s.to)];
-  const maxP = Math.max(...probs, result.prob) * 1.08;
-  const x = (p) => padL + p / maxP * (width - padL - padR);
-
-  return (
-    <div style={{ position: 'relative', overflowX: 'auto' }} className="scroll">
-      <svg width={width} height={H} style={{ display: 'block' }}>
-        {/* baseline marker */}
-        <line x1={x(result.baseProb)} y1={padT + 4} x2={x(result.baseProb)} y2={padT + steps.length * rowH + 8}
-        stroke="var(--ink-4)" strokeWidth={1.2} strokeDasharray="3 3" />
-        <text x={x(result.baseProb)} y={padT - 2} fontSize={10.5} fill="var(--ink-3)" textAnchor="middle" fontFamily="var(--mono)">
-          base {pct(result.baseProb, 1)}
-        </text>
-
-        {steps.map((s, i) => {
-          const y = padT + 12 + i * rowH;
-          const up = s.dp >= 0;
-          const x0 = x(s.from),x1 = x(s.to);
-          const left = Math.min(x0, x1),w = Math.max(2, Math.abs(x1 - x0));
-          const c = up ? 'var(--high)' : 'var(--low)';
-          return (
-            <g key={s.key}
-            onMouseMove={(e) => {const r = e.currentTarget.ownerSVGElement.getBoundingClientRect();
-              setTip({ x: e.clientX - r.left, y: y + 6, html: `<b>${s.label}</b> = ${s.display}<br/>${up ? '▲ raises' : '▼ lowers'} risk by ${pct(Math.abs(s.dp), 2)}` });}}
-            onMouseLeave={() => setTip(null)} style={{ cursor: 'default' }}>
-              <text x={padL - 14} y={y + rowH / 2} textAnchor="end" dominantBaseline="middle"
-              fontSize={13} fill="var(--ink-2)" fontWeight="500">{s.label}</text>
-              <text x={padL - 14} y={y + rowH / 2 + 14} textAnchor="end" dominantBaseline="middle"
-              fontSize={11} fill="var(--ink-4)" fontFamily="var(--mono)">{s.display}</text>
-              {/* connector */}
-              {i > 0 && <line x1={x(steps[i - 1].to)} y1={y - rowH + rowH / 2 + 7} x2={x(steps[i - 1].to)} y2={y + rowH / 2 - 7}
-              stroke="var(--border-strong)" strokeWidth={1} strokeDasharray="2 2" />}
-              <rect x={left} y={y + 5} width={w} height={rowH - 18} rx={3} fill={c} opacity={0.9} />
-              <text x={up ? x1 + 8 : left - 8} y={y + rowH / 2} dominantBaseline="middle"
-              textAnchor={up ? 'start' : 'end'} fontSize={11.5} fontFamily="var(--mono)" fontWeight="600" fill={up ? 'var(--high-strong)' : 'var(--low-strong)'}>
-                {up ? '+' : '−'}{pct(Math.abs(s.dp), 1)}
-              </text>
-            </g>);
-
-        })}
-
-        {/* final */}
-        {(() => {
-          const y = padT + 12 + steps.length * rowH + 10;
-          const xf = x(result.prob);
-          return <g>
-            <line x1={padL} y1={y} x2={width - padR} y2={y} stroke="var(--border)" strokeWidth={1} />
-            <line x1={xf} y1={padT + 4} x2={xf} y2={y + 30} stroke={RISK[result.band].s} strokeWidth={1.6} />
-            <rect x={padL} y={y + 12} width={xf - padL} height={20} rx={4} fill={RISK[result.band].c} opacity={0.18} />
-            <rect x={padL} y={y + 12} width={Math.max(3, xf - padL)} height={20} rx={4} fill="none" stroke={RISK[result.band].s} strokeWidth={1.4} />
-            <text x={padL - 14} y={y + 23} textAnchor="end" dominantBaseline="middle" fontSize={13} fontWeight="700" fill="var(--ink)">Final estimate</text>
-            <text x={xf + 9} y={y + 23} dominantBaseline="middle" fontSize={13} fontFamily="var(--mono)" fontWeight="700" fill={RISK[result.band].s}>{pct(result.prob, 1)}</text>
-          </g>;
-        })()}
-      </svg>
-      {tipNode}
-    </div>);
-
-}
-
-/* ===================================================================
    RISK-DISTRIBUTION HISTOGRAM (stacked: count + default overlay)
    =================================================================== */
 function Histogram({ data, thresholds, width = 560, height = 220 }) {
@@ -326,4 +258,4 @@ function BandBar({ counts, total }) {
 
 }
 
-Object.assign(window, { RiskGauge, Waterfall, Histogram, KSCurve, LineCurve, FairnessBars, BandBar, RISK, pct });
+Object.assign(window, { RiskGauge, Histogram, KSCurve, LineCurve, FairnessBars, BandBar, RISK, pct });
