@@ -1,6 +1,10 @@
-/* Backend API base URL.
-   - Empty string = same origin (Hugging Face Spaces, which serves this app itself).
-   - For the Vercel-hosted frontend, set this to the HF Space backend URL, e.g.
-       window.API_BASE = "https://<owner>-creditlens.hf.space";
+/* Backend API base URL, chosen by where the frontend is served from:
+   - localhost / 127.0.0.1  -> "" (same origin: local `make serve`)
+   - *.hf.space             -> "" (same origin, if ever served by the HF backend)
+   - anything else (Vercel) -> the deployed HF Spaces backend
 */
-window.API_BASE = "";
+window.API_BASE = (
+  location.hostname === "localhost" ||
+  location.hostname === "127.0.0.1" ||
+  location.hostname.endsWith(".hf.space")
+) ? "" : "https://MohamedGamal04-creditlens.hf.space";
