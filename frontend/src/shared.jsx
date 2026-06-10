@@ -10,6 +10,7 @@ const Icon = {
   modelcard: <g><path d="M4 4h16v16H4z" /><path d="M8 9h8M8 13h8M8 17h5" /></g>,
   upload: <g><path d="M12 16V4M7 9l5-5 5 5" /><path d="M5 20h14" /></g>,
   arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
+  menu: <path d="M4 6h16M4 12h16M4 18h16" />,
   bolt: <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" />,
   check: <path d="M5 12l5 5L20 6" />,
   info: <g><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></g>,

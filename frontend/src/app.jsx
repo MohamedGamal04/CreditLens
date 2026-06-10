@@ -33,6 +33,13 @@ function App() {
   const [batchFile, setBatchFile] = useState(null);
   const [model, setModel] = useState('lgbm');
 
+  // Sidebar collapse → icon-only rail. Persisted; defaults to collapsed on narrow screens.
+  const [navCollapsed, setNavCollapsed] = useState(() => {
+    const saved = localStorage.getItem('cl-nav-collapsed');
+    return saved != null ? saved === '1' : window.innerWidth <= 760;
+  });
+  useEff(() => { localStorage.setItem('cl-nav-collapsed', navCollapsed ? '1' : '0'); }, [navCollapsed]);
+
   // thresholds from tweaks → into the model
   const thresholds = { low: t.lowCut / 100, high: t.highCut / 100 };
   useEff(() => { CL.setThresholds(thresholds.low, thresholds.high); }, [t.lowCut, t.highCut]);
@@ -103,7 +110,10 @@ function App() {
     : localResult;
 
 
-  const go = r => { setRoute(r); location.hash = r; document.querySelector('.main').scrollTop = 0; };
+  const go = r => {
+    setRoute(r); location.hash = r; document.querySelector('.main').scrollTop = 0;
+    if (window.innerWidth <= 760) setNavCollapsed(true);  // close the mobile drawer after navigating
+  };
   useEff(() => {
     const h = () => setRoute(location.hash.replace('#', '') || 'applicant');
     window.addEventListener('hashchange', h); return () => window.removeEventListener('hashchange', h);
@@ -135,7 +145,7 @@ function App() {
   const [title, sub] = TITLES[route];
 
   return (
-    <div className={`app density-${t.density}`}>
+    <div className={`app density-${t.density}${navCollapsed ? ' nav-collapsed' : ''}`}>
       {backendUp === false && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000,
           background: '#b45309', color: '#fff', padding: '7px 14px', fontSize: 13,
@@ -161,17 +171,23 @@ function App() {
 
         <div className="nav-section-label">Underwriting</div>
         {NAV.map(n => (
-          <button key={n.id} className={`nav-item ${route === n.id ? 'active' : ''}`} onClick={() => go(n.id)}>
-            <I name={n.icon} size={17} />{n.label}
+          <button key={n.id} className={`nav-item ${route === n.id ? 'active' : ''}`} onClick={() => go(n.id)} title={n.label}>
+            <I name={n.icon} size={17} /><span className="nav-label">{n.label}</span>
             {n.id === 'portfolio' && portfolio && <span className="nav-badge">{portfolio.length}</span>}
             {n.id === 'applicant' && <span className="nav-badge" style={{ background: route === 'applicant' ? 'rgba(255,255,255,.2)' : RISK[result.band].c, color: '#fff' }}>{pct(result.prob, 0)}</span>}
           </button>
         ))}
       </aside>
 
+      {/* mobile drawer backdrop — only visible when the sidebar overlays content */}
+      <div className="nav-backdrop" onClick={() => setNavCollapsed(true)} />
+
       {/* main */}
       <main className="main">
         <header className="topbar">
+          <button className="nav-toggle" aria-label="Toggle sidebar" onClick={() => setNavCollapsed(c => !c)}>
+            <I name="menu" size={18} />
+          </button>
           <div>
             <div className="crumb">CreditLens <span style={{ color: 'var(--ink-4)' }}>/</span> {sub}</div>
             <h1>{title}</h1>

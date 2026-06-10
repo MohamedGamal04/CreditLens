@@ -440,3 +440,69 @@ input, select { font-family: inherit; }
 .main::-webkit-scrollbar, .scroll::-webkit-scrollbar { width: 11px; height: 11px; }
 .main::-webkit-scrollbar-thumb, .scroll::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 8px; border: 3px solid var(--canvas); }
 .scroll::-webkit-scrollbar-thumb { border-color: var(--surface); }
+
+/* ===================================================================
+   Sidebar collapse (icon rail) + responsive layout
+   =================================================================== */
+
+/* topbar toggle — collapses / expands the sidebar */
+.nav-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; flex: none;
+  border: 1px solid var(--border-strong); border-radius: var(--r);
+  background: var(--surface); color: var(--ink-2);
+  transition: background 0.14s, border-color 0.14s;
+}
+.nav-toggle:hover { background: var(--surface-3); border-color: var(--ink-4); }
+
+.nav-label { white-space: nowrap; }
+
+/* backdrop only renders on the phone drawer (see media query) */
+.nav-backdrop { display: none; }
+
+/* ---------- collapsed: icon-only rail ---------- */
+.app.nav-collapsed { --sidebar-w: 70px; }
+.nav-collapsed .sidebar { padding: 22px 12px; }
+.nav-collapsed .brand { gap: 0; justify-content: center; padding: 4px 0 18px; }
+.nav-collapsed .brand > div:last-child,
+.nav-collapsed .nav-section-label,
+.nav-collapsed .nav-label,
+.nav-collapsed .nav-badge,
+.nav-collapsed .sidebar-foot .who,
+.nav-collapsed .sidebar-foot .role { display: none; }
+.nav-collapsed .nav-item { justify-content: center; gap: 0; padding: 10px 0; }
+.nav-collapsed .sidebar-foot { justify-content: center; }
+
+/* ---------- tablet: collapse the page-level split into one column ---------- */
+@media (max-width: 1080px) {
+  .page-wrap > .grid { grid-template-columns: 1fr !important; }
+}
+
+/* ---------- narrow tablet / large phone ---------- */
+@media (max-width: 860px) {
+  .topbar { padding: 14px 18px; gap: 12px; flex-wrap: wrap; }
+  .topbar h1 { font-size: 17px; }
+  .page-wrap { padding: 20px 18px 50px; }
+  .density-compact .page-wrap { padding: 16px 16px 44px; }
+  .model-menu { width: min(320px, calc(100vw - 32px)); }
+}
+
+/* ---------- phone: stack every grid; sidebar drawer overlays content ---------- */
+@media (max-width: 680px) {
+  /* override the inline gridTemplateColumns on the page cards */
+  .page-wrap .grid { grid-template-columns: 1fr !important; }
+  .main { overflow-x: hidden; }
+
+  /* collapsed = 70px icon rail in normal flow (from --sidebar-w above).
+     expanded = fixed 244px drawer over content; keep a 70px gutter so
+     content doesn't shift when toggling. */
+  .app:not(.nav-collapsed) { grid-template-columns: 70px 1fr; }
+  .app:not(.nav-collapsed) .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 200;
+    width: 244px; overflow-y: auto; box-shadow: var(--shadow-lg);
+  }
+  .app:not(.nav-collapsed) .nav-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 150;
+    background: rgba(15, 23, 42, 0.45);
+  }
+}
